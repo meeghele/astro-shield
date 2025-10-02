@@ -5,6 +5,8 @@
 
 # Astro Shield
 
+> **⚠️ Warning:** Still under development.
+
 Proof-of-work (PoW) gate with honeypot and decoy link protection for Astro sites. A minimal integration that adds multi-layered client-side bot protection without requiring external services.
 
 ## Overview
