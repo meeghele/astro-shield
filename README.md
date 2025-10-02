@@ -244,6 +244,23 @@ Both standard and shielded images have their URLs visible in the HTML source cod
 
 `<ShieldedImage>` improves user experience by hiding content until validation, and adds a minor hurdle for unsophisticated scrapers. It is **not** a security feature against determined bots that can parse HTML or make direct HTTP requests to image URLs.
 
+## Testing
+
+You can test Astro Shield locally using the included demo app:
+
+```bash
+# Navigate to the app directory
+cd app
+
+# Install dependencies
+bun install
+
+# Start the development server
+bun run dev
+```
+
+The app demonstrates the gate flow with honeypot protection and shielded images. Visit `http://localhost:4321` to see the PoW gate in action.
+
 ## Development
 
 ```bash
