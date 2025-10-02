@@ -1,5 +1,6 @@
 [![npm version](https://img.shields.io/npm/v/@meeghele/astro-shield.svg)](https://www.npmjs.com/package/@meeghele/astro-shield)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Astro](https://img.shields.io/badge/Astro-FF5D01?logo=astro&logoColor=white)](https://astro.build)
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
 
 # Astro Shield
