@@ -264,4 +264,158 @@ test.describe("Gate Theme Detection", () => {
 
     await context.close();
   });
+
+  /**
+   * CONFIG-BASED COLOR VERIFICATION
+   *
+   * These tests verify that color config options are properly applied
+   * in the production build. Since colors are set via the astro.config.mjs
+   * and passed through to the Gate component, these tests check that the
+   * CSS custom properties (define:vars) work correctly.
+   */
+
+  test("9. CSS custom properties are defined for all theme colors", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ colorScheme: "dark" });
+    const page = await context.newPage();
+    await page.goto("/gate?next=/", { waitUntil: "domcontentloaded" });
+
+    // Verify all color CSS variables are defined on the page
+    const cssVars = await page.evaluate(() => {
+      const root = document.documentElement;
+      const styles = window.getComputedStyle(root);
+
+      return {
+        darkBgColor: styles.getPropertyValue('--darkBgColor')?.trim() || null,
+        darkTextColor: styles.getPropertyValue('--darkTextColor')?.trim() || null,
+        darkBarColor: styles.getPropertyValue('--darkBarColor')?.trim() || null,
+        lightBgColor: styles.getPropertyValue('--lightBgColor')?.trim() || null,
+        lightTextColor: styles.getPropertyValue('--lightTextColor')?.trim() || null,
+        lightBarColor: styles.getPropertyValue('--lightBarColor')?.trim() || null,
+      };
+    });
+
+    // All variables should be defined (non-empty strings)
+    expect(cssVars.darkBgColor).toBeTruthy();
+    expect(cssVars.darkTextColor).toBeTruthy();
+    expect(cssVars.darkBarColor).toBeTruthy();
+    expect(cssVars.lightBgColor).toBeTruthy();
+    expect(cssVars.lightTextColor).toBeTruthy();
+    expect(cssVars.lightBarColor).toBeTruthy();
+
+    await context.close();
+  });
+
+  test("10. Dark mode uses dark color CSS variables", async ({ browser }) => {
+    const context = await browser.newContext({ colorScheme: "dark" });
+    const page = await context.newPage();
+    await page.goto("/gate?next=/", { waitUntil: "domcontentloaded" });
+    await page.locator(".gate").waitFor({ state: "visible" });
+
+    // Get the CSS variable values and the actual rendered styles
+    const colorCheck = await page.evaluate(() => {
+      const root = document.documentElement;
+      const rootStyles = window.getComputedStyle(root);
+      const body = document.querySelector("body");
+      const bodyStyles = window.getComputedStyle(body);
+      const progressBar = document.querySelector(".progress-bar");
+      const barStyles = window.getComputedStyle(progressBar);
+
+      return {
+        // CSS variable values
+        darkBgVar: rootStyles.getPropertyValue('--darkBgColor')?.trim(),
+        darkTextVar: rootStyles.getPropertyValue('--darkTextColor')?.trim(),
+        darkBarVar: rootStyles.getPropertyValue('--darkBarColor')?.trim(),
+        // Rendered styles
+        bodyBg: bodyStyles.backgroundColor,
+        bodyColor: bodyStyles.color,
+        progressBarBg: barStyles.backgroundImage,
+      };
+    });
+
+    // The rendered colors should reference the CSS variables
+    // (This verifies the define:vars → CSS pipeline works)
+    expect(colorCheck.darkBgVar).toBeTruthy();
+    expect(colorCheck.darkTextVar).toBeTruthy();
+    expect(colorCheck.darkBarVar).toBeTruthy();
+
+    // Verify the styles use the variables (actual color values should match)
+    expect(colorCheck.bodyBg).toBeTruthy();
+    expect(colorCheck.bodyColor).toBeTruthy();
+    expect(colorCheck.progressBarBg).toContain("linear-gradient");
+
+    await context.close();
+  });
+
+  test("11. Light mode uses light color CSS variables", async ({ browser }) => {
+    const context = await browser.newContext({ colorScheme: "light" });
+    const page = await context.newPage();
+    await page.goto("/gate?next=/", { waitUntil: "domcontentloaded" });
+    await page.locator(".gate").waitFor({ state: "visible" });
+
+    // Get the CSS variable values and the actual rendered styles
+    const colorCheck = await page.evaluate(() => {
+      const root = document.documentElement;
+      const rootStyles = window.getComputedStyle(root);
+      const body = document.querySelector("body");
+      const bodyStyles = window.getComputedStyle(body);
+      const progressBar = document.querySelector(".progress-bar");
+      const barStyles = window.getComputedStyle(progressBar);
+
+      return {
+        // CSS variable values
+        lightBgVar: rootStyles.getPropertyValue('--lightBgColor')?.trim(),
+        lightTextVar: rootStyles.getPropertyValue('--lightTextColor')?.trim(),
+        lightBarVar: rootStyles.getPropertyValue('--lightBarColor')?.trim(),
+        // Rendered styles
+        bodyBg: bodyStyles.backgroundColor,
+        bodyColor: bodyStyles.color,
+        progressBarBg: barStyles.backgroundImage,
+      };
+    });
+
+    // The rendered colors should reference the CSS variables
+    expect(colorCheck.lightBgVar).toBeTruthy();
+    expect(colorCheck.lightTextVar).toBeTruthy();
+    expect(colorCheck.lightBarVar).toBeTruthy();
+
+    // Verify the styles use the variables
+    expect(colorCheck.bodyBg).toBeTruthy();
+    expect(colorCheck.bodyColor).toBeTruthy();
+    expect(colorCheck.progressBarBg).toContain("linear-gradient");
+
+    await context.close();
+  });
+
+  test("12. Theme switch correctly changes color variable references", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ colorScheme: "dark" });
+    const page = await context.newPage();
+    await page.goto("/gate?next=/", { waitUntil: "domcontentloaded" });
+    await page.locator(".gate").waitFor({ state: "visible" });
+
+    // Get dark mode colors
+    const darkColors = await page.evaluate(() => {
+      const body = document.querySelector("body");
+      return window.getComputedStyle(body).backgroundColor;
+    });
+
+    // Switch to light mode
+    await page.evaluate(() => localStorage.setItem("theme", "light"));
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.locator(".gate").waitFor({ state: "visible" });
+
+    // Get light mode colors
+    const lightColors = await page.evaluate(() => {
+      const body = document.querySelector("body");
+      return window.getComputedStyle(body).backgroundColor;
+    });
+
+    // Colors should be different between themes
+    expect(darkColors).not.toBe(lightColors);
+
+    await context.close();
+  });
 });

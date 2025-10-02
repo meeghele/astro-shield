@@ -1,6 +1,6 @@
 {
   "name": "@meeghele/astro-shield",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Proof-of-work gate with honeypot and decoy link protection for Astro sites.",
   "type": "module",
   "license": "MIT",

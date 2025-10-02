@@ -5,7 +5,7 @@ import { defineConfig, devices } from "@playwright/test";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const PORT = 4321;
+const PORT = 5000;
 const HOST = "localhost";
 const BASE_URL = `http://${HOST}:${PORT}`;
 const MODULE_DIR = fileURLToPath(new URL(".", import.meta.url));

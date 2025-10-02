@@ -6,9 +6,9 @@ import astroShield from "@meeghele/astro-shield";
 
 export default defineConfig({
   server: {
-    port: 4322,
+    port: 5000,
   },
-  site: "http://localhost:4322",
+  site: "http://localhost:5000",
   integrations: [
     astroShield({
       gatePath: "/gate",

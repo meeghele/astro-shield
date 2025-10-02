@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "astro dev --port 4332",
+    "dev": "astro dev --port 5000",
     "build": "astro build",
-    "preview": "astro preview --port 4322",
+    "preview": "astro preview --port 5000",
     "preview:test": "astro preview",
     "lint": "astro check",
     "test": "playwright test",

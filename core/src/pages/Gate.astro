@@ -69,8 +69,8 @@ const parseNumericOverride = (value, fallback) => {
 };
 
 const userConfig =
-  Astro.props.userConfig && typeof Astro.props.userConfig === "object"
-    ? Astro.props.userConfig
+  ASTRO_SHIELD_OPTIONS?.shield && typeof ASTRO_SHIELD_OPTIONS.shield === "object"
+    ? ASTRO_SHIELD_OPTIONS.shield
     : {};
 
 const next = sanitizeNextPath(
