@@ -3,11 +3,22 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 import BaseLayout from "../layouts/BaseLayout.astro";
+import ShieldedImage from "@meeghele/astro-shield/components/ShieldedImage.astro";
 ---
 
 <BaseLayout title="Astro Shield Playground">
   <h1>Astro Shield Playground</h1>
   <p>Welcome to <a href="https://github.com/meeghele/astro-shield" target="_blank" rel="noopener noreferrer">astro-shield</a></p>
+
+  <section style="display: flex; justify-content: center;">
+    <ShieldedImage
+      src="/ufo.png"
+      alt="Protected UFO illustration"
+      width={400}
+      height={400}
+      style="width: 100%; max-width: 400px; border-radius: 8px; margin: 1rem 0;"
+    />
+  </section>
 
   <section>
     <h2>Why you're seeing this page</h2>
