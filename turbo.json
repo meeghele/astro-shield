@@ -14,6 +14,7 @@
       "dependsOn": ["^build"]
     },
     "test": {
+      "cache": false,
       "dependsOn": ["build"],
       "inputs": ["tests/**", "playwright.config.ts"],
       "outputs": ["test-results/**", "playwright-report/**"]

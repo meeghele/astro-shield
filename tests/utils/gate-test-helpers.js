@@ -11,9 +11,9 @@ const PROGRESS_SELECTOR = ".progress-container";
 
 /**
  * Default timeouts aligned with Gate configuration:
- * - Gate PoW timeout: 10s (timeoutMs: 10000)
- * - Gate min solve duration: 600ms (minSolveDurationMs: 600)
- * - Gate redirect delay: 500ms (redirectDelayMs: 500)
+ * - Gate PoW timeout: 8s (timeoutMs: 8000)
+ * - Gate min solve duration: 1000ms (minSolveDurationMs: 1000)
+ * - Gate redirect delay: 5000ms (redirectDelayMs: 5000)
  */
 export const DEFAULT_TIMEOUTS = {
   /** Wait for PoW to start (should be quick) */
@@ -25,7 +25,7 @@ export const DEFAULT_TIMEOUTS = {
   /** Wait for PoW completion with honeypot penalty (+50% for increased difficulty) */
   COMPLETE_PENALTY: 15000,
   /** Wait for redirect after completion */
-  REDIRECT: 2000,
+  REDIRECT: 6000,
 };
 
 /**

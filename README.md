@@ -149,8 +149,8 @@ All settings are optional. Here are the defaults with descriptions:
   shield: {
     // Proof-of-work settings
     difficulty: 8,                    // PoW difficulty (8=very easy, 12=easy, 16=medium, 20=hard)
-    timeoutMs: 10000,                 // Max time to solve PoW (10 seconds)
-    minSolveDurationMs: 600,          // Minimum solve time to prevent precomputed solutions (0.6 seconds)
+    timeoutMs: 8000,                  // Max time to solve PoW (8 seconds)
+    minSolveDurationMs: 1000,         // Minimum solve time to prevent precomputed solutions (1 second)
 
     // Token management
     tokenTtlMinutes: 30,              // Token validity duration (30 minutes)
@@ -173,7 +173,7 @@ All settings are optional. Here are the defaults with descriptions:
 
     // UX settings
     redirectTo: '/',                  // Redirect destination after solving
-    redirectDelayMs: 500,             // Delay before redirect (0.5 seconds)
+    redirectDelayMs: 5000,            // Delay before redirect (5 seconds)
     showProgress: true,               // Show solving progress bar
     showDebugInfo: false,             // Display debug information in console
 
@@ -184,6 +184,7 @@ All settings are optional. Here are the defaults with descriptions:
     lightBgColor: '#ffffff',          // Light mode background color
     lightTextColor: '#374151',        // Light mode text color
     lightBarColor: '#f97316',         // Light mode progress bar color
+    themeClassName: 'theme-sleek',    // Theme class name for dark/light mode compatibility
 
     // Advanced
     shieldNamespace: 'as',            // Custom localStorage namespace for token storage

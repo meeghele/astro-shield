@@ -17,7 +17,7 @@ export default defineConfig({
         // Original repo timing (from www.meeghele.com/src/pages/gate.astro)
         difficulty: 12,              // Medium difficulty
         timeoutMs: 8000,             // 8 seconds max
-        redirectDelayMs: 2000,       // 2 second delay after completion
+        redirectDelayMs: 5000,       // 5 second delay after completion
         minSolveDurationMs: 1000,    // Show solving UI for at least 1 second
         showDebugInfo: true,
         enableHoneypots: true,

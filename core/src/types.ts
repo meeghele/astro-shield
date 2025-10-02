@@ -23,6 +23,13 @@ export interface ShieldConfig {
   showProgress?: boolean;
   showDebugInfo?: boolean;
   minSolveDurationMs?: number;
+  // Theme colors (Gate component only)
+  darkBgColor?: string;
+  darkTextColor?: string;
+  darkBarColor?: string;
+  lightBgColor?: string;
+  lightTextColor?: string;
+  lightBarColor?: string;
 }
 
 export interface AstroShieldOptions {

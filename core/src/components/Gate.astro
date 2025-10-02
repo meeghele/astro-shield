@@ -7,6 +7,7 @@ import { gateStatusDescriptors } from '../gate-statuses.js';
 // Gate component props with sensible defaults
 const {
   redirectTo = '/',
+  themeClassName = 'theme-sleek',  // Theme class name for dark/light mode compatibility
   // Security challenge settings
   difficulty = 8,           // PoW difficulty - lower = easier (8 = very easy, 12 = easy, 16 = medium, 20 = hard)
   timeoutMs = 10000,        // Max time for PoW in milliseconds (10 seconds default)
@@ -42,7 +43,7 @@ const {
 } = Astro.props;
 ---
 
-<html lang="en">
+<html class={themeClassName} lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -57,11 +58,41 @@ const {
     <meta name="darkreader-lock" />
     <meta name="darkreader" content="NO-DARKREADER-PLUGIN" />
 
-    <style is:inline define:vars={{ darkBgColor, darkTextColor, darkBarColor, lightBgColor, lightTextColor, lightBarColor }}>
-      :root {
-        color-scheme: light dark;
-      }
+    <!-- Theme detection - must run before styles apply to prevent FOUC -->
+    <script is:inline>
+      (function () {
+        const THEME_KEY = "theme";
 
+        const getStoredTheme = () => {
+          try {
+            const stored = window.localStorage.getItem(THEME_KEY);
+            return (stored === "dark" || stored === "light") ? stored : null;
+          } catch {
+            return null;
+          }
+        };
+
+        const getSystemTheme = () => {
+          return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+        };
+
+        // Priority: localStorage → system preference
+        const storedTheme = getStoredTheme();
+        const systemTheme = getSystemTheme();
+        const preferredTheme = storedTheme || systemTheme;
+
+        // Apply dark class if needed
+        if (preferredTheme === "dark") {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+      })();
+    </script>
+
+    <style define:vars={{ darkBgColor, darkTextColor, darkBarColor, lightBgColor, lightTextColor, lightBarColor }}>
       html, body {
         margin: 0;
         padding: 0;
@@ -136,46 +167,6 @@ const {
         text-decoration: underline;
       }
 
-      @media (prefers-color-scheme: light) {
-        body {
-          background-color: var(--lightBgColor);
-          color: var(--lightTextColor);
-        }
-
-        .progress-bar {
-          background: linear-gradient(90deg, var(--lightBarColor), var(--lightBarColor));
-        }
-
-        .gate__status,
-        .gate__meta {
-          color: var(--lightTextColor);
-        }
-
-        .gate__meta-link {
-          color: var(--lightBarColor);
-        }
-      }
-
-      .theme-sleek:not(.dark) body {
-        background-color: var(--lightBgColor);
-        color: var(--lightTextColor);
-      }
-
-      .theme-sleek:not(.dark) .progress-bar {
-        background: linear-gradient(90deg, var(--lightBarColor), var(--lightBarColor));
-      }
-
-      html.dark body,
-      .theme-sleek.dark body {
-        background-color: var(--darkBgColor);
-        color: var(--darkTextColor);
-      }
-
-      html.dark .progress-bar,
-      .theme-sleek.dark .progress-bar {
-        background: linear-gradient(90deg, var(--darkBarColor), var(--darkBarColor));
-      }
-
       @media (prefers-reduced-motion: reduce) {
         .progress-bar {
           transition: none;
@@ -210,6 +201,86 @@ const {
 
       [data-role="gate-status-code"] {
         display: none !important;
+      }
+
+      /* Light mode - system preference */
+      @media (prefers-color-scheme: light) {
+        body {
+          background-color: var(--lightBgColor);
+          color: var(--lightTextColor);
+        }
+
+        .progress-container {
+          background-color: rgba(55, 65, 81, 0.1);
+        }
+
+        .progress-bar {
+          background: linear-gradient(90deg, var(--lightBarColor), var(--lightBarColor));
+        }
+
+        .gate__status {
+          color: var(--lightTextColor);
+        }
+
+        .gate__meta {
+          color: var(--lightTextColor);
+        }
+
+        .gate__meta-link {
+          color: var(--lightBarColor);
+        }
+      }
+
+      /* Light mode - explicit via theme class */
+      .theme-sleek:not(.dark) body {
+        background-color: var(--lightBgColor);
+        color: var(--lightTextColor);
+      }
+
+      .theme-sleek:not(.dark) .progress-container {
+        background-color: rgba(55, 65, 81, 0.1);
+      }
+
+      .theme-sleek:not(.dark) .progress-bar {
+        background: linear-gradient(90deg, var(--lightBarColor), var(--lightBarColor));
+      }
+
+      .theme-sleek:not(.dark) .gate__status {
+        color: var(--lightTextColor);
+      }
+
+      .theme-sleek:not(.dark) .gate__meta {
+        color: var(--lightTextColor);
+      }
+
+      .theme-sleek:not(.dark) .gate__meta-link {
+        color: var(--lightBarColor);
+      }
+
+      /* Dark mode - explicit via theme class */
+      .theme-sleek.dark body {
+        background-color: var(--darkBgColor);
+        color: var(--darkTextColor);
+      }
+
+      .theme-sleek.dark .progress-container {
+        background-color: rgba(168, 162, 158, 0.2);
+      }
+
+      .theme-sleek.dark .progress-bar {
+        background: linear-gradient(90deg, var(--darkBarColor), var(--darkBarColor));
+      }
+
+      .theme-sleek.dark .gate__status {
+        color: var(--darkTextColor);
+      }
+
+      .theme-sleek.dark .gate__meta {
+        color: var(--darkTextColor);
+      }
+
+      .theme-sleek.dark .gate__meta-link {
+        color: var(--darkBarColor);
       }
     </style>
   </head>
