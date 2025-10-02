@@ -1,0 +1,824 @@
+---
+// Copyright (c) 2025 Michele Tavella <meeghele@proton.me>
+// Licensed under the MIT License. See LICENSE file for details.
+
+import { gateStatusDescriptors } from '../gate-statuses.js';
+
+// Gate component props with sensible defaults
+const {
+  redirectTo = '/',
+  // Security challenge settings
+  difficulty = 8,           // PoW difficulty - lower = easier (8 = very easy, 12 = easy, 16 = medium, 20 = hard)
+  timeoutMs = 10000,        // Max time for PoW in milliseconds (10 seconds default)
+  tokenTtlMinutes = 30,     // Token validity in minutes
+  // Near-miss acceptance for slow devices
+  nearMissThreshold = 4,    // Accept solutions within this many bits of target difficulty
+  minAcceptable = 4,        // Minimum difficulty to accept regardless of target
+  enableNearMisses = true,  // Allow near-miss acceptance when PoW runs out of time
+  // Honeypot penalty settings
+  honeypotPenalty = 1,      // Extra difficulty added for honeypot trips
+  maxPenaltyDiff = 16,      // Maximum difficulty after penalties
+  // Honeypot controls
+  enableHoneypots = true,   // Enable/disable honeypot traps completely
+  enableInputHoneypots = true,    // Enable input field honeypots (hp1-hp5)
+  enableLinkDecoys = true,        // Enable link decoys (decoy1-decoy3)
+  enableFinalCheck = true,        // Enable final honeypot value check before token creation
+  enableTimeValidation = true,    // Enable time-based validation helpers across the site
+  honeypotPrefix = 'hp',          // Prefix used in honeypot reason codes (customizable)
+  decoyPrefix = 'dc',             // Prefix used in link decoy reason codes (customizable)
+  shieldNamespace = 'as',         // Namespace used for storage keys and reason codes
+  redirectDelayMs = 500,          // Delay before redirecting after success
+  // UI settings
+  showProgress = true,      // Show progress bar
+  showDebugInfo = false,    // Show console debug info (useful for testing)
+  minSolveDurationMs = 600, // Minimum time to keep solving state visible
+  // Theme colors
+  darkBgColor = '#0e141b',        // Dark mode background color
+  darkTextColor = '#d6d3d1',      // Dark mode text color
+  darkBarColor = '#facc15',       // Dark mode progress bar color
+  lightBgColor = '#ffffff',       // Light mode background color
+  lightTextColor = '#374151',     // Light mode text color
+  lightBarColor = '#f97316',      // Light mode progress bar color
+} = Astro.props;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Checking your browser…</title>
+    <meta name="robots" content="noindex, nofollow" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+
+    <!-- Dark Reader compatibility -->
+    <meta name="darkreader-lock" />
+    <meta name="darkreader" content="NO-DARKREADER-PLUGIN" />
+
+    <style is:inline define:vars={{ darkBgColor, darkTextColor, darkBarColor, lightBgColor, lightTextColor, lightBarColor }}>
+      :root {
+        color-scheme: light dark;
+      }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+        width: 100%;
+        font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      }
+
+      body {
+        min-height: 100vh;
+        background-color: var(--darkBgColor);
+        color: var(--darkTextColor);
+        display: flex;
+      }
+
+      .gate {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        padding: 48px 16px;
+        text-align: center;
+      }
+
+      .gate__inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .progress-container {
+        width: 300px;
+        max-width: 80vw;
+        height: 3px;
+        background-color: rgba(168, 162, 158, 0.2);
+        border-radius: 1.5px;
+        overflow: hidden;
+      }
+
+      .progress-bar {
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, var(--darkBarColor), var(--darkBarColor));
+        border-radius: 1.5px;
+        transition: width 0.35s ease;
+      }
+
+      .gate__status {
+        margin: 0;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        color: var(--darkTextColor);
+      }
+
+      .gate__meta {
+        margin: 0;
+        font-size: 0.75rem;
+        color: var(--darkTextColor);
+        opacity: 0.85;
+      }
+
+      .gate__meta-link {
+        color: var(--darkBarColor);
+        text-decoration: none;
+      }
+
+      .gate__meta-link:hover,
+      .gate__meta-link:focus {
+        text-decoration: underline;
+      }
+
+      @media (prefers-color-scheme: light) {
+        body {
+          background-color: var(--lightBgColor);
+          color: var(--lightTextColor);
+        }
+
+        .progress-bar {
+          background: linear-gradient(90deg, var(--lightBarColor), var(--lightBarColor));
+        }
+
+        .gate__status,
+        .gate__meta {
+          color: var(--lightTextColor);
+        }
+
+        .gate__meta-link {
+          color: var(--lightBarColor);
+        }
+      }
+
+      .theme-sleek:not(.dark) body {
+        background-color: var(--lightBgColor);
+        color: var(--lightTextColor);
+      }
+
+      .theme-sleek:not(.dark) .progress-bar {
+        background: linear-gradient(90deg, var(--lightBarColor), var(--lightBarColor));
+      }
+
+      html.dark body,
+      .theme-sleek.dark body {
+        background-color: var(--darkBgColor);
+        color: var(--darkTextColor);
+      }
+
+      html.dark .progress-bar,
+      .theme-sleek.dark .progress-bar {
+        background: linear-gradient(90deg, var(--darkBarColor), var(--darkBarColor));
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .progress-bar {
+          transition: none;
+        }
+      }
+
+      .hp {
+        position: absolute !important;
+        left: -10000px !important;
+        top: auto !important;
+        width: 1px !important;
+        height: 1px !important;
+        overflow: hidden !important;
+        clip: rect(1px, 1px, 1px, 1px) !important;
+        white-space: nowrap !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+      }
+
+      .hp-visible {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+      }
+
+      .hp-css {
+        color: transparent !important;
+        background: transparent !important;
+        border: none !important;
+        font-size: 0 !important;
+      }
+
+      [data-role="gate-status-code"] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="gate">
+      <div class="gate__inner">
+        {showProgress && (
+          <div
+            class="progress-container"
+            role="progressbar"
+            aria-label="Security challenge progress"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="0"
+          >
+            <div id="gate-progress" class="progress-bar"></div>
+          </div>
+        )}
+
+        <p id="status" class="gate__status" role="status" aria-live="polite" data-status-code="initializing">
+          Preparing verification…
+        </p>
+
+        <span
+          id="gate-status-debug"
+          data-role="gate-status-code"
+          data-status-code="initializing"
+          data-active="true"
+          hidden
+          aria-hidden="true"
+        >initializing</span>
+
+        <p class="gate__meta">
+          This website is protected by 
+          <a class="gate__meta-link" href="https://github.com/meeghele/astro-shield" target="_blank" rel="noopener">
+            astro-shield
+          </a>
+        </p>
+      </div>
+
+      {enableHoneypots && enableInputHoneypots && (
+        <>
+          <!-- Multiple honeypot types -->
+          <input id="hp1" class="hp" name="website" autocomplete="off" tabindex="-1" aria-hidden="true" placeholder="Leave empty" />
+          <input id="hp2" class="hp" name="email2" type="email" autocomplete="off" tabindex="-1" aria-hidden="true" placeholder="Alternative email" />
+          <input id="hp3" class="hp" name="url" type="url" autocomplete="off" tabindex="-1" aria-hidden="true" placeholder="Website URL" />
+          <div class="hp-visible">
+            <input id="hp4" name="confirm_human" type="checkbox" tabindex="-1" />
+            <label for="hp4">Check this box to confirm you are human</label>
+          </div>
+          <input id="hp5" class="hp-css" name="comments" tabindex="-1" aria-hidden="true" placeholder="Comments" />
+        </>
+      )}
+
+      {enableHoneypots && enableLinkDecoys && (
+        <>
+          <a id="decoy1" href="/admin" class="hp" aria-hidden="true">Admin Panel</a>
+          <a id="decoy2" href="/login" class="hp" aria-hidden="true">Login</a>
+          <a id="decoy3" href="/download" class="hp" aria-hidden="true">Download</a>
+        </>
+      )}
+
+      <noscript>
+        <p style="color: var(--color-primary-main, #f97316); font-weight: 600; margin-top: 20px;">
+          Please enable JavaScript. This security check requires JavaScript to verify you're not a bot.
+        </p>
+      </noscript>
+    </div>
+
+    <script is:inline define:vars={{
+      tokenTtlMinutes,
+      difficulty,
+      timeoutMs,
+      nearMissThreshold,
+      minAcceptable,
+      enableNearMisses,
+      honeypotPenalty,
+      maxPenaltyDiff,
+      enableHoneypots,
+      enableInputHoneypots,
+      enableLinkDecoys,
+      enableFinalCheck,
+      enableTimeValidation,
+      honeypotPrefix,
+      decoyPrefix,
+      shieldNamespace,
+      redirectDelayMs,
+      showDebugInfo,
+      redirectTo,
+      minSolveDurationMs,
+      statusDescriptors: gateStatusDescriptors
+    }}>
+      (async () => {
+        try {
+          // Configuration from Astro props
+        const PRODUCT_NAME = 'astro-shield';
+        const sanitizeNamespace = (value, fallback) => {
+          if (typeof value !== 'string') {
+            return fallback;
+          }
+          const normalized = value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+          return normalized || fallback;
+        };
+        const SHIELD_NAMESPACE = sanitizeNamespace(shieldNamespace, 'as');
+        const runtimeName = (value) => `${SHIELD_NAMESPACE}_${value}`;
+        const sanitizePrefix = (value, fallback) => {
+          if (typeof value !== 'string') {
+            return fallback;
+          }
+          const trimmed = value.trim();
+          if (trimmed === '') {
+            return '';
+          }
+          const normalized = trimmed.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+          return normalized;
+        };
+        const HONEYPOT_PREFIX = sanitizePrefix(honeypotPrefix, 'hp');
+        const DECOY_PREFIX = sanitizePrefix(decoyPrefix, 'dc');
+        const TIME_BUCKET = Math.floor(Date.now() / (10 * 60 * 1000));
+        const generateHash = (parts, length = 8) => {
+          const seed = parts.filter(Boolean).join('|');
+          let hash = 0;
+          for (let i = 0; i < seed.length; i++) {
+            hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+          }
+          const base36 = hash.toString(36);
+          if (base36.length >= length) {
+            return base36.slice(-length);
+          }
+          return base36.padStart(length, '0');
+        };
+        const buildReason = (type, detail, extra = '') => {
+          const prefix = type === 'decoy' ? DECOY_PREFIX : HONEYPOT_PREFIX;
+          const hash = generateHash([
+            SHIELD_NAMESPACE,
+            prefix,
+            type,
+            detail,
+            extra,
+            String(TIME_BUCKET),
+          ]);
+          const reasonValue = prefix ? `${prefix}_${hash}` : hash;
+          return runtimeName(reasonValue);
+        };
+        const SHIELD_STORAGE_KEYS = Object.freeze({
+          token: runtimeName('gate_token_key_v1'),
+          timePreference: runtimeName('hp_time_validation_enabled'),
+          honeypotTripCount: runtimeName('hp_trip_count'),
+          honeypotTripped: runtimeName('hp_tripped'),
+          honeypotReason: runtimeName('hp_reason'),
+          honeypotClicked: runtimeName('hp_clicked'),
+          honeypotFocus: runtimeName('hp_focus'),
+        });
+        const reasonCode = {
+          honeypot: (detail, extra) => buildReason('honeypot', detail, extra),
+          decoy: (detail, extra) => buildReason('decoy', detail, extra),
+          system: (detail) => runtimeName(`sys_${detail}`),
+        };
+        if (typeof window !== 'undefined') {
+          const overrides = {
+            shieldNamespace: SHIELD_NAMESPACE,
+            honeypotPrefix: HONEYPOT_PREFIX,
+            decoyPrefix: DECOY_PREFIX,
+          };
+
+          window.__ASTRO_SHIELD_CONFIG__ = {
+            ...(window.__ASTRO_SHIELD_CONFIG__ || {}),
+            ...overrides,
+          };
+
+          try {
+            const serialized = JSON.stringify(overrides);
+
+            try {
+              localStorage.setItem(
+                '__ASTRO_SHIELD_CONFIG_OVERRIDES__',
+                serialized,
+              );
+            } catch (_error) {
+              void _error;
+            }
+
+            try {
+              sessionStorage.setItem(
+                '__ASTRO_SHIELD_CONFIG_OVERRIDES__',
+                serialized,
+              );
+            } catch (_error) {
+              void _error;
+            }
+          } catch (_error) {
+            void _error;
+          }
+        }
+        // Configuration from Astro props
+        const TOKEN_KEY = SHIELD_STORAGE_KEYS.token;
+        const TTL = tokenTtlMinutes * 60 * 1000;      // Token TTL in milliseconds
+        let DIFF = difficulty;                        // Base difficulty
+        const TIMEOUT_MS = timeoutMs;                 // Max time for PoW
+        const NEAR_MISS_THRESHOLD = nearMissThreshold; // Near-miss acceptance
+        const MIN_ACCEPTABLE = minAcceptable;         // Minimum acceptable difficulty
+        const ALLOW_NEAR_MISS = enableNearMisses;     // Toggle near-miss handling
+        const HONEYPOT_PENALTY = honeypotPenalty;     // Penalty for honeypot trips
+        const MAX_PENALTY_DIFF = maxPenaltyDiff;      // Maximum difficulty after penalties
+        const SHOW_DEBUG = showDebugInfo;             // Debug logging
+        const MIN_SOLVE_DURATION_MS = Math.max(0, Number(minSolveDurationMs) || 0);
+        const STATUS_DESCRIPTORS = statusDescriptors || {};
+        const fallbackStatus =
+          STATUS_DESCRIPTORS.error ||
+          STATUS_DESCRIPTORS.initializing ||
+          { code: 'unknown', message: 'Please wait…', debug: true };
+
+        const status = document.getElementById('status');
+        const statusDebug = document.getElementById('gate-status-debug');
+        const progressContainer = document.querySelector('.progress-container');
+        const progressBar = document.getElementById('gate-progress');
+
+        const getStatusDescriptor = (code) => {
+          if (code && Object.prototype.hasOwnProperty.call(STATUS_DESCRIPTORS, code)) {
+            return STATUS_DESCRIPTORS[code];
+          }
+          if (code) {
+            return { ...fallbackStatus, code };
+          }
+          return fallbackStatus;
+        };
+
+        const applyProgress = (value) => {
+          if (!progressBar && !progressContainer) return;
+          const normalized = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
+          if (progressBar) {
+            progressBar.style.width = `${normalized}%`;
+          }
+          if (progressContainer) {
+            progressContainer.setAttribute('aria-valuenow', String(Math.round(normalized)));
+          }
+        };
+
+        const setStatus = (code, options = {}) => {
+          const descriptor = getStatusDescriptor(code);
+          if (status) {
+            status.textContent = descriptor.message;
+            status.dataset.statusCode = descriptor.code;
+          }
+          if (statusDebug) {
+            statusDebug.dataset.statusCode = descriptor.code;
+            statusDebug.dataset.active = descriptor.debug === false ? 'false' : 'true';
+            statusDebug.textContent = descriptor.code;
+          }
+          if (typeof options.progress === 'number') {
+            applyProgress(options.progress);
+          }
+        };
+
+        applyProgress(0);
+        setStatus('initializing', { progress: 0 });
+
+        /* eslint-disable no-console */
+        const storage = {
+          get(key) {
+            try {
+              const value = localStorage.getItem(key);
+              if (value !== null) return value;
+            } catch (_error) {
+              void _error;
+              /* ignore storage errors */
+            }
+            try {
+              return sessionStorage.getItem(key);
+            } catch (_error) {
+              void _error;
+              /* ignore storage errors */
+            }
+            return null;
+          },
+          set(key, value) {
+            try { localStorage.setItem(key, value); } catch (_error) { void _error; /* ignore storage errors */ }
+            try { sessionStorage.setItem(key, value); } catch (_error) { void _error; /* ignore storage errors */ }
+          },
+          remove(key) {
+            try { localStorage.removeItem(key); } catch (_error) { void _error; /* ignore storage errors */ }
+            try { sessionStorage.removeItem(key); } catch (_error) { void _error; /* ignore storage errors */ }
+          }
+        };
+
+        const debugLog = (scope, message, detail) => {
+          if (!SHOW_DEBUG) return;
+          if (detail !== undefined) {
+            console.log(`[${PRODUCT_NAME}, ${scope}]: ${message}`, detail);
+          } else {
+            console.log(`[${PRODUCT_NAME}, ${scope}]: ${message}`);
+          }
+        };
+
+        debugLog('init', 'Debug logging active');
+
+        const queryParams = new URLSearchParams(location.search);
+        const NEXT = queryParams.get("next") || redirectTo;
+        const isTrap = queryParams.get("trap");
+        const isHoneypotTrip = queryParams.get("hp");
+
+        const TIME_PREF_KEY = SHIELD_STORAGE_KEYS.timePreference;
+
+        const rememberTimeValidationPreference = (enabled) => {
+          const value = enabled ? 'true' : 'false';
+          try { localStorage.setItem(TIME_PREF_KEY, value); } catch (_error) { void _error; }
+          try { sessionStorage.setItem(TIME_PREF_KEY, value); } catch (_error) { void _error; }
+        };
+
+        let timeValidationEnabled = enableTimeValidation !== false && enableTimeValidation !== 'false';
+        const storedTimePref = storage.get(TIME_PREF_KEY);
+        if (storedTimePref === 'true') timeValidationEnabled = true;
+        if (storedTimePref === 'false') timeValidationEnabled = false;
+        const timeValidationParam = queryParams.get("enableTimeValidation");
+        if (timeValidationParam !== null) {
+          timeValidationEnabled = !(timeValidationParam === 'false' || timeValidationParam === '0');
+        }
+
+        rememberTimeValidationPreference(timeValidationEnabled);
+        debugLog('init', 'Time validation preference applied', {
+          timeValidationEnabled,
+          storedTimePref,
+          timeValidationParam,
+        });
+
+        debugLog('init', 'Gate run context', {
+          NEXT,
+          isTrap,
+          isHoneypotTrip,
+          redirectTo,
+          enableHoneypots,
+          enableInputHoneypots,
+          enableLinkDecoys,
+          enableFinalCheck,
+          enableTimeValidation,
+          enableNearMisses,
+          shieldNamespace: SHIELD_NAMESPACE,
+          honeypotPrefix: HONEYPOT_PREFIX,
+          decoyPrefix: DECOY_PREFIX,
+          redirectDelayMs,
+        });
+
+        const now = Date.now();
+
+        // Check if already passed and not a forced re-challenge
+        if (!isTrap && !isHoneypotTrip) {
+          try {
+            const rawToken = storage.get(TOKEN_KEY);
+            const existing = JSON.parse(rawToken || "null");
+            if (existing && existing.exp > now) {
+              debugLog('tokenCheck', 'Valid gate token found; bypassing challenge', { exp: existing.exp, NEXT });
+              return location.replace(NEXT);
+            }
+          } catch (_error) {
+            void _error;
+            /* ignore parse errors */
+            debugLog('tokenCheck', 'Stored token invalid or unreadable; proceeding with challenge');
+          }
+        }
+
+        // Adjust difficulty based on honeypot history (only if honeypots are enabled)
+        if (enableHoneypots) {
+          try {
+            const tripCount = parseInt(storage.get(SHIELD_STORAGE_KEYS.honeypotTripCount) || "0", 10);
+            if (tripCount > 0) {
+              DIFF = Math.min(MAX_PENALTY_DIFF, DIFF + Math.min(tripCount * HONEYPOT_PENALTY, 8));
+              debugLog('difficulty', 'Applied historical honeypot penalty', { tripCount, adjustedDifficulty: DIFF });
+            }
+            if (isHoneypotTrip) {
+              DIFF += HONEYPOT_PENALTY; // Extra penalty for this session
+              storage.set(SHIELD_STORAGE_KEYS.honeypotTripCount, String(tripCount + 1));
+              debugLog('difficulty', 'Session honeypot triggered; increasing difficulty', { tripCount: tripCount + 1, adjustedDifficulty: DIFF });
+            }
+          } catch (_error) {
+            void _error;
+            /* ignore storage errors */
+            debugLog('difficulty', 'Unable to read/update honeypot penalty counters');
+          }
+        }
+
+        const tick = (p) => {
+          applyProgress(p);
+        };
+
+        // Get honeypot elements (only if honeypots are enabled)
+        const honeypots = enableHoneypots && enableInputHoneypots
+          ? ['hp1', 'hp2', 'hp3', 'hp4', 'hp5'].map(id => document.getElementById(id)).filter(el => el)
+          : [];
+        const decoys = enableHoneypots && enableLinkDecoys
+          ? ['decoy1', 'decoy2', 'decoy3'].map(id => document.getElementById(id)).filter(el => el)
+          : [];
+
+        const touchedHoneypots = new WeakSet();
+        const markTouched = (hp) => {
+          if (hp) {
+            touchedHoneypots.add(hp);
+          }
+        };
+
+        // Honeypot trip detection
+        let honeypotTripped = false;
+        const tripGate = (reason, context = {}) => {
+          if (honeypotTripped) return;
+          honeypotTripped = true;
+          const payload = JSON.stringify({
+            reason,
+            timestamp: Date.now(),
+            path: location.pathname,
+            ...context,
+          });
+          storage.set(SHIELD_STORAGE_KEYS.honeypotTripped, payload);
+          storage.set(SHIELD_STORAGE_KEYS.honeypotReason, reason);
+          const next = encodeURIComponent(NEXT);
+          debugLog('tripGate', 'Redirecting after honeypot trigger', { reason, next });
+          setStatus('redirecting');
+          location.replace("/gate?hp=1&reason=" + reason + "&next=" + next);
+        };
+
+        // Monitor honeypots (only if enabled)
+        if (enableHoneypots && enableInputHoneypots) {
+          honeypots.forEach((hp, index) => {
+            if (!hp) return;
+            const suffix = `${index + 1}`;
+            const makeMetadata = (eventType) => ({ category: 'honeypot', event: `${eventType}_${suffix}` });
+            hp.addEventListener('input', () => {
+              markTouched(hp);
+              const detail = `input_${suffix}`;
+              tripGate(reasonCode.honeypot(detail, NEXT), makeMetadata('input'));
+            }, {passive: true});
+            hp.addEventListener('change', () => {
+              markTouched(hp);
+              const detail = `change_${suffix}`;
+              tripGate(reasonCode.honeypot(detail, NEXT), makeMetadata('change'));
+            }, {passive: true});
+            hp.addEventListener('focus', () => {
+              markTouched(hp);
+              const detail = `focus_${suffix}`;
+              tripGate(reasonCode.honeypot(detail, NEXT), makeMetadata('focus'));
+            }, {passive: true});
+            hp.addEventListener('click', () => {
+              markTouched(hp);
+              const detail = `click_${suffix}`;
+              tripGate(reasonCode.honeypot(detail, NEXT), makeMetadata('click'));
+            }, {passive: true});
+          });
+        }
+
+        // Monitor decoy links (only if enabled)
+        if (enableHoneypots && enableLinkDecoys) {
+          decoys.forEach((decoy, index) => {
+            if (!decoy) return;
+            decoy.addEventListener('click', (e) => {
+              e.preventDefault();
+              const detail = `click_${index + 1}`;
+              tripGate(reasonCode.decoy(detail, NEXT), { category: 'decoy', event: detail });
+            }, {passive: false});
+          });
+        }
+
+        // Proof of work helper functions
+        async function sha(s) {
+          const b = new TextEncoder().encode(s);
+          const d = await crypto.subtle.digest('SHA-256', b);
+          return new Uint8Array(d);
+        }
+
+        function lzBits(bytes) {
+          let bits = 0;
+          for (let b of bytes) {
+            if (b === 0) {
+              bits += 8;
+              continue;
+            }
+            for (let i = 7; i >= 0; i--) {
+              if (b & (1 << i)) return bits + (7 - i);
+            }
+          }
+          return bits;
+        }
+
+        // Start proof of work
+        setStatus('pow-start');
+        // Allow the DOM to paint the solving state before heavy work starts
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const challenge = ["v1", location.host, Math.floor(now/(5*60*1000))].join("|");
+        let nonce = 0, best = 0, solved = null;
+        const deadline = performance.now() + TIMEOUT_MS;
+        const solveStart = performance.now();
+
+        debugLog('pow', 'Starting PoW computation', { DIFF, challenge, timeoutMs: TIMEOUT_MS });
+
+        while (performance.now() < deadline && !honeypotTripped) {
+          const z = lzBits(await sha(challenge + "|" + nonce));
+          if (z > best) {
+            best = z;
+            tick(Math.min(100, best / DIFF * 100));
+            debugLog('pow', 'Progress update', { best, target: DIFF, percent: Math.min(100, best / DIFF * 100) });
+          }
+          if (z >= DIFF) {
+            solved = {nonce, z};
+            debugLog('pow', 'Solved challenge', solved);
+            break;
+          }
+          nonce++;
+
+          // Yield control periodically
+          if ((nonce & 1023) === 0) {
+            await new Promise(r => setTimeout(r, 1));
+          }
+        }
+
+        if (honeypotTripped) return; // Exit if honeypot was triggered during PoW
+
+        // Accept near-misses to handle slow devices
+        const threshold = Math.max(MIN_ACCEPTABLE, DIFF - NEAR_MISS_THRESHOLD);
+        if (ALLOW_NEAR_MISS && !solved && best >= threshold) {
+          solved = {nonce, z: best, degraded: true};
+          debugLog('pow', 'Accepting near-miss solution', { best, DIFF, threshold });
+        } else if (!ALLOW_NEAR_MISS && !solved && best >= threshold) {
+          debugLog('pow', 'Near-miss rejected because feature disabled', { best, DIFF, threshold });
+        }
+
+        if (!solved) {
+          setStatus('pow-incomplete');
+          debugLog('pow', 'PoW failed before deadline', { best, DIFF, threshold, nonce, challenge });
+          return;
+        }
+
+        // Final honeypot check before creating token (skip in test environments or if disabled)
+        const shouldCheckHoneypots = enableHoneypots && enableFinalCheck && enableInputHoneypots;
+        if (shouldCheckHoneypots) {
+          const flaggedHoneypots = honeypots.filter(hp => hp && typeof hp.value === 'string' && hp.value.trim() !== '');
+          if (flaggedHoneypots.length > 0) {
+            const suspicious = flaggedHoneypots.filter(hp => touchedHoneypots.has(hp));
+            if (suspicious.length > 0) {
+            debugLog('finalCheck', 'Interacted honeypot has value; aborting', suspicious.map(hp => hp ? {id: hp.id, value: hp.value} : null));
+            return tripGate(
+              reasonCode.system('final_check_failed'),
+              { category: 'system', event: 'final_check_failed' }
+            );
+            }
+
+            // Clear autofilled honeypots that weren't interacted with to avoid looping legitimate users
+            if (timeValidationEnabled) {
+              flaggedHoneypots.forEach(hp => {
+                hp.value = '';
+                hp.removeAttribute('value');
+              });
+              debugLog('finalCheck', 'Cleared autofilled honeypots prior to token issuance', flaggedHoneypots.map(hp => hp ? hp.id : null));
+            }
+          }
+        }
+
+        // Enforce a minimum time showing the solving state so users notice it
+        const elapsed = performance.now() - solveStart;
+        if (elapsed < MIN_SOLVE_DURATION_MS) {
+          await new Promise((resolve) => setTimeout(resolve, MIN_SOLVE_DURATION_MS - elapsed));
+        }
+
+        // Create and store token
+        const exp = now + TTL;
+        const payload = JSON.stringify({
+          exp,
+          host: location.host,
+          z: solved.z,
+          n: solved.nonce,
+          degraded: solved.degraded || false,
+          timestamp: now
+        });
+
+        const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
+        const hex = Array.from(new Uint8Array(h))
+          .map(b => b.toString(16).padStart(2, "0"))
+          .join("")
+          .slice(0, 16);
+        const token = btoa(payload) + "." + hex;
+
+        storage.set(TOKEN_KEY, JSON.stringify({token, exp}));
+        debugLog('token', 'Stored gate token after successful challenge', { exp, z: solved.z, degraded: solved.degraded || false });
+
+        // Ensure main layout shows loading screen after redirect by clearing first-visit flag
+        storage.remove('meeghele-visited');
+        debugLog('token', 'Cleared meeghele first-visit flag to force loading screen on return');
+
+        // Clear honeypot flags on successful completion
+        storage.remove(SHIELD_STORAGE_KEYS.honeypotTripped);
+        storage.remove(SHIELD_STORAGE_KEYS.honeypotClicked);
+        storage.remove(SHIELD_STORAGE_KEYS.honeypotFocus);
+        storage.remove(SHIELD_STORAGE_KEYS.honeypotReason);
+        debugLog('cleanup', 'Cleared honeypot flags following success');
+
+        tick(100);
+        setStatus('pow-complete', { progress: 100 });
+        debugLog('complete', 'Challenge complete; scheduling redirect', { NEXT, redirectDelayMs });
+
+        setTimeout(() => {
+          setStatus('redirecting');
+          location.replace(NEXT);
+        }, redirectDelayMs);
+      } catch (error) {
+        try {
+          console.error('[astro-shield, error]: Gate execution failed', error);
+        } catch (_consoleError) {
+          void _consoleError;
+        }
+        setStatus('error');
+      }
+      /* eslint-enable no-console */
+      })();
+    </script>
+  </body>
+</html>

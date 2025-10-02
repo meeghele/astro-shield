@@ -1,0 +1,75 @@
+{
+  "name": "@meeghele/astro-shield",
+  "version": "0.0.1",
+  "description": "Proof-of-work gate and honeypot and decoy link protection for Astro sites.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Michele Tavella <meeghele@proton.me>",
+  "keywords": [
+    "astro",
+    "astro-integration",
+    "bot-protection",
+    "proof-of-work",
+    "honeypot",
+    "scraper-protection",
+    "anti-bot",
+    "anti-scraper",
+    "pow",
+    "security",
+    "static-site",
+    "client-side",
+    "decoy-links",
+    "captcha-alternative"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./package.json": "./package.json",
+    "./components/*": "./src/components/*",
+    "./pages/*": "./src/pages/*",
+    "./scripts/*": "./src/scripts/*",
+    "./runtime/*": "./src/runtime/*",
+    "./gate-statuses": "./src/gate-statuses.js",
+    "./types": {
+      "import": "./src/types.ts",
+      "types": "./src/types.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src/components",
+    "src/pages",
+    "src/scripts",
+    "src/runtime",
+    "src/gate-statuses.js",
+    "src/types.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --sourcemap --dts --external astro",
+    "lint": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "astro": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "tsup": "^8.3.4",
+    "typescript": "^5.9.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/meeghele/astro-shield"
+  },
+  "bugs": {
+    "url": "https://github.com/meeghele/astro-shield/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

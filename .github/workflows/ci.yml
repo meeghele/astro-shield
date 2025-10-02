@@ -1,0 +1,43 @@
+name: astro-shield-ci
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - feat/**
+      - chore/**
+      - fix/**
+  pull_request:
+    branches:
+      - main
+      - develop
+      - feat/**
+      - chore/**
+      - fix/**
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container: oven/bun:latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install make
+        run: apt-get update && apt-get install -y make
+
+      - name: install dependencies
+        run: make install
+
+      - name: install e2e dependencies
+        run: make deps
+
+      - name: lint
+        run: make lint
+
+      - name: test
+        run: make test
+
+      - name: build
+        run: make build

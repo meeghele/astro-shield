@@ -1,0 +1,171 @@
+---
+// Copyright (c) 2025 Michele Tavella <meeghele@proton.me>
+// Licensed under the MIT License. See LICENSE file for details.
+
+import Gate from "../components/Gate.astro";
+import { ASTRO_SHIELD_OPTIONS } from "../runtime/config";
+
+const fallbackParams = Astro.url?.searchParams
+  ? new URLSearchParams(Astro.url.searchParams)
+  : new URLSearchParams();
+
+const normaliseEntries = (entries) =>
+  entries.map(([key, value]) => {
+    if (Array.isArray(value)) {
+      return [key, String(value[0] ?? "")];
+    }
+    return [key, String(value ?? "")];
+  });
+
+const createSearchParams = (source) => {
+  if (!source) {
+    return new URLSearchParams(fallbackParams);
+  }
+  if (source instanceof URLSearchParams) {
+    return new URLSearchParams(source);
+  }
+  if (typeof source === "string") {
+    return new URLSearchParams(source);
+  }
+  if (Array.isArray(source)) {
+    return new URLSearchParams(source);
+  }
+  if (typeof source === "object") {
+    return new URLSearchParams(normaliseEntries(Object.entries(source)));
+  }
+  return new URLSearchParams(fallbackParams);
+};
+
+const searchParams = createSearchParams(
+  Astro.props.query ?? Astro.props.searchParams,
+);
+
+const sanitizeNextPath = (value) => {
+  if (!value) return "/";
+  const trimmed = String(value).trim();
+  if (!trimmed) return "/";
+  if (/^https?:/i.test(trimmed)) {
+    try {
+      const parsed = new URL(trimmed);
+      const safePath =
+        `${parsed.pathname}${parsed.search}${parsed.hash}` || "/";
+      return safePath.startsWith("/") ? safePath : `/${safePath}`;
+    } catch {
+      return "/";
+    }
+  }
+  if (trimmed.startsWith("/")) {
+    return trimmed;
+  }
+  return `/${trimmed}`;
+};
+
+const parseNumericOverride = (value, fallback) => {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const userConfig =
+  Astro.props.userConfig && typeof Astro.props.userConfig === "object"
+    ? Astro.props.userConfig
+    : {};
+
+const next = sanitizeNextPath(
+  searchParams.get("next") ?? userConfig.redirectTo,
+);
+const reason = searchParams.get("reason");
+const hp = searchParams.get("hp");
+const trap = searchParams.get("trap");
+
+// Parse configuration overrides from URL parameters
+const showProgressParam = searchParams.get("showProgress");
+const difficultyParam = searchParams.get("difficulty");
+const timeoutMsParam = searchParams.get("timeoutMs");
+const nearMissThresholdParam = searchParams.get("nearMissThreshold");
+const minAcceptableParam = searchParams.get("minAcceptable");
+
+// Log honeypot trips for analysis (server-side if needed)
+if (reason || hp || trap) {
+  console.log(
+    `Gate accessed with: reason=${reason}, hp=${hp}, trap=${trap}, next=${next}`,
+  );
+}
+
+// Shield configuration - adjust these values based on your needs
+const mergedConfig = {
+  difficulty: 8,                 // Easy but reliable (6 = very easy, 8 = easy, 12 = medium, 16 = hard, 20+ = very hard)
+  timeoutMs: 20000,              // 20 seconds max (generous for slow devices and debugging)
+  tokenTtlMinutes: 30,           // 30 minutes token validity (good balance)
+  nearMissThreshold: 4,          // Accept solutions within 4 bits of target (more forgiving)
+  minAcceptable: 4,              // Minimum difficulty to accept (very forgiving)
+  enableNearMisses: true,        // Whether to honor near-miss PoW results
+  honeypotPenalty: 2,            // Add 2 difficulty per honeypot trip
+  maxPenaltyDiff: 14,            // Cap penalty difficulty at 14
+  enableHoneypots: true,         // Master switch for all honeypot functionality
+  enableInputHoneypots: true,    // Enable hidden input field traps (hp1-hp5)
+  enableLinkDecoys: true,        // Enable link decoys (decoy1-decoy3)
+  enableFinalCheck: true,        // Enable final value check before token creation
+  enableTimeValidation: true,    // Enable time-based honeypot validation helpers
+  honeypotPrefix: "hp",          // Prefix used for honeypot reason codes (customisable)
+  decoyPrefix: "dc",             // Prefix used for link decoy reason codes
+  shieldNamespace: "as",         // Namespace applied to storage keys and reason payloads
+  showProgress: true,            // Show progress bar
+  showDebugInfo: true,           // Enable debugging to troubleshoot issues
+  redirectDelayMs: 1000,         // Delay (ms) before redirecting after successful challenge
+  minSolveDurationMs: 600,       // Keep solving UI visible for at least this long
+  ...userConfig,
+};
+
+const shieldConfig = {
+  ...mergedConfig,
+  redirectTo: next,
+
+  // Security challenge settings (with URL parameter overrides)
+  difficulty: parseNumericOverride(difficultyParam, mergedConfig.difficulty),
+  timeoutMs: parseNumericOverride(timeoutMsParam, mergedConfig.timeoutMs),
+
+  // Near-miss acceptance (helps with device compatibility)
+  nearMissThreshold: parseNumericOverride(
+    nearMissThresholdParam,
+    mergedConfig.nearMissThreshold,
+  ),
+  minAcceptable: parseNumericOverride(
+    minAcceptableParam,
+    mergedConfig.minAcceptable,
+  ),
+
+  // UI settings (with URL parameter overrides)
+  showProgress:
+    showProgressParam !== null
+      ? showProgressParam !== "false"
+      : mergedConfig.showProgress,
+};
+
+// Recommended settings for different use cases:
+//
+// DEVELOPMENT/TESTING (no honeypots for clean testing):
+// { difficulty: 4, timeoutMs: 20000, showDebugInfo: true, enableHoneypots: false }
+//
+// LIGHT PROTECTION (fast, user-friendly with basic honeypots):
+// { difficulty: 8, timeoutMs: 10000, tokenTtlMinutes: 60, enableFinalCheck: false }
+//
+// MEDIUM PROTECTION (balanced with all honeypot types):
+// { difficulty: 12, timeoutMs: 8000, tokenTtlMinutes: 30 }
+//
+// STRONG PROTECTION (slower, more secure with aggressive honeypots):
+// { difficulty: 16, timeoutMs: 5000, honeypotPenalty: 3, maxPenaltyDiff: 20 }
+//
+// MAXIMUM PROTECTION (may frustrate some users):
+// { difficulty: 20, timeoutMs: 3000, honeypotPenalty: 4, maxPenaltyDiff: 24 }
+//
+// HONEYPOT-ONLY MODE (no PoW, just honeypot detection):
+// { difficulty: 0, timeoutMs: 1000, enableFinalCheck: true, enableInputHoneypots: true }
+//
+// NO-HONEYPOT MODE (PoW only, for environments with form auto-fill issues):
+// { difficulty: 12, enableHoneypots: false }
+---
+
+<Gate {...shieldConfig} />

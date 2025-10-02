@@ -1,0 +1,479 @@
+---
+// Copyright (c) 2025 Michele Tavella <meeghele@proton.me>
+// Licensed under the MIT License. See LICENSE file for details.
+
+// Honeypot component - invisible traps for bots
+const {
+  variant = "default",
+  enableTimeValidation = true,
+  honeypotPrefix = 'hp',
+  decoyPrefix = 'dc',
+  shieldNamespace = 'as',
+} = Astro.props;
+---
+
+<!-- Multiple honeypot techniques in one component -->
+<div
+  class="honeypot-container"
+  data-honeypot-variant={variant}
+  data-enable-time-validation={enableTimeValidation ? "true" : "false"}
+>
+  <!-- Classic form field honeypots -->
+  <input
+    class="honeypot hp-website"
+    name="website"
+    type="url"
+    autocomplete="off"
+    tabindex="-1"
+    aria-hidden="true"
+    placeholder="Your website URL"
+  />
+
+  <input
+    class="honeypot hp-email2"
+    name="email2"
+    type="email"
+    autocomplete="off"
+    tabindex="-1"
+    aria-hidden="true"
+    placeholder="Secondary email"
+  />
+
+  <input
+    class="honeypot hp-phone"
+    name="phone"
+    type="tel"
+    autocomplete="off"
+    tabindex="-1"
+    aria-hidden="true"
+    placeholder="Phone number"
+  />
+
+  <!-- Checkbox honeypot -->
+  <div class="honeypot hp-checkbox-container">
+    <input
+      class="honeypot hp-checkbox"
+      id={`confirm-human-${variant}`}
+      name="confirm_human"
+      type="checkbox"
+      tabindex="-1"
+      aria-hidden="true"
+    />
+    <label for={`confirm-human-${variant}`} class="honeypot">Check this to confirm you are human</label>
+  </div>
+
+  <!-- Text area honeypot -->
+  <textarea
+    class="honeypot hp-comments"
+    name="comments"
+    rows="3"
+    autocomplete="off"
+    tabindex="-1"
+    aria-hidden="true"
+    placeholder="Additional comments"
+  ></textarea>
+
+  <!-- Decoy links -->
+  <div class="honeypot-links">
+    <a href="/admin" class="honeypot hp-link" aria-hidden="true">Admin Login</a>
+    <a href="/wp-admin" class="honeypot hp-link" aria-hidden="true">WordPress Admin</a>
+    <a href="/phpmyadmin" class="honeypot hp-link" aria-hidden="true">Database</a>
+    <a href="/download/all" class="honeypot hp-link" aria-hidden="true">Download All Content</a>
+    <a href="/api/users" class="honeypot hp-link" aria-hidden="true">User API</a>
+  </div>
+
+  <!-- Time-based honeypot -->
+  <input
+    class="honeypot hp-timestamp"
+    name="timestamp"
+    type="hidden"
+    value={Date.now()}
+    autocomplete="off"
+  />
+
+  <!-- CSS-based visible honeypot (hidden via CSS) -->
+  <div class="honeypot-visible-trap">
+    <input
+      class="honeypot hp-visible"
+      name="human_check"
+      type="text"
+      placeholder="Leave this field empty"
+    />
+    <p class="honeypot">If you are human, do not fill this field</p>
+  </div>
+</div>
+
+<style>
+  /* Primary honeypot hiding technique */
+  .honeypot {
+    position: absolute !important;
+    left: -10000px !important;
+    top: auto !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+    clip: rect(1px, 1px, 1px, 1px) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    color: transparent !important;
+    font-size: 0 !important;
+    line-height: 0 !important;
+  }
+
+  /* Secondary hiding for visible trap */
+  .honeypot-visible-trap {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    height: 0 !important;
+    width: 0 !important;
+    overflow: hidden !important;
+    position: absolute !important;
+    z-index: -9999 !important;
+  }
+
+  /* Container hiding */
+  .honeypot-container {
+    position: absolute !important;
+    left: -10000px !important;
+    top: -10000px !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    visibility: hidden !important;
+  }
+
+  /* Accessibility hiding (screen reader users should skip) */
+  .honeypot[aria-hidden="true"] {
+    speak: none !important;
+  }
+
+  /* Prevent any interaction */
+  .honeypot,
+  .honeypot * {
+    pointer-events: none !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+  }
+
+  /* Re-enable pointer events for our monitoring */
+  .honeypot input,
+  .honeypot textarea,
+  .honeypot select,
+  .honeypot button,
+  .honeypot a {
+    pointer-events: auto !important;
+  }
+
+  /* Media query honeypots - some bots ignore media queries */
+  @media (max-width: 1px) {
+    .honeypot-visible-trap {
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      position: static !important;
+      height: auto !important;
+      width: auto !important;
+    }
+  }
+
+  /* Print media honeypot */
+  @media print {
+    .honeypot-container {
+      display: none !important;
+    }
+  }
+</style>
+
+<script define:vars={{ variant, enableTimeValidation, honeypotPrefix, decoyPrefix, shieldNamespace }}>
+  // Enhanced honeypot monitoring
+  document.addEventListener('DOMContentLoaded', () => {
+    const container = document.querySelector(`[data-honeypot-variant="${variant}"]`);
+    if (!container) return;
+
+    const globalConfig = (typeof window !== 'undefined' && window.__ASTRO_SHIELD_CONFIG__) || {};
+
+    const sanitizeNamespace = (value, fallback) => {
+      if (typeof value !== 'string') {
+        return fallback;
+      }
+      const normalized = value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+      return normalized || fallback;
+    };
+    const resolvedNamespace = shieldNamespace ?? (globalConfig.shieldNamespace ?? 'as');
+    const PRODUCT_NAMESPACE = sanitizeNamespace(resolvedNamespace, 'as');
+    const runtimeName = (value) => `${PRODUCT_NAMESPACE}_${value}`;
+    const sanitizePrefix = (value, fallback) => {
+      if (typeof value !== 'string') {
+        return fallback;
+      }
+      const trimmed = value.trim();
+      if (trimmed === '') {
+        return '';
+      }
+      const normalized = trimmed.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+      return normalized;
+    };
+    const selectPrefix = (value, fallback) => {
+      if (value !== undefined && value !== null) {
+        return String(value);
+      }
+      return fallback;
+    };
+    const resolvedHoneypotPrefix = selectPrefix(honeypotPrefix, globalConfig.honeypotPrefix);
+    const resolvedDecoyPrefix = selectPrefix(decoyPrefix, globalConfig.decoyPrefix);
+    const HONEYPOT_PREFIX = sanitizePrefix(resolvedHoneypotPrefix, 'hp');
+    const DECOY_PREFIX = sanitizePrefix(resolvedDecoyPrefix, 'dc');
+    const TIME_BUCKET = Math.floor(Date.now() / (10 * 60 * 1000));
+    const generateHash = (parts, length = 8) => {
+      const seed = parts.filter(Boolean).join('|');
+      let hash = 0;
+      for (let i = 0; i < seed.length; i++) {
+        hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+      }
+      const base36 = hash.toString(36);
+      if (base36.length >= length) {
+        return base36.slice(-length);
+      }
+      return base36.padStart(length, '0');
+    };
+    const buildReason = (type, detail, extra = '') => {
+      const prefix = type === 'decoy' ? DECOY_PREFIX : HONEYPOT_PREFIX;
+      const hash = generateHash([
+        PRODUCT_NAMESPACE,
+        prefix,
+        type,
+        variant,
+        detail,
+        extra,
+        String(TIME_BUCKET),
+      ]);
+      const reasonValue = prefix ? `${prefix}_${hash}` : hash;
+      return runtimeName(reasonValue);
+    };
+
+    const SHIELD_STORAGE_KEYS = Object.freeze({
+      honeypotTripped: runtimeName('hp_tripped'),
+      honeypotReason: runtimeName('hp_reason'),
+    });
+
+    if (typeof window !== 'undefined') {
+      window.__ASTRO_SHIELD_CONFIG__ = {
+        ...(window.__ASTRO_SHIELD_CONFIG__ || {}),
+        shieldNamespace: PRODUCT_NAMESPACE,
+        honeypotPrefix: HONEYPOT_PREFIX,
+        decoyPrefix: DECOY_PREFIX,
+      };
+    }
+
+    const TIME_PREF_KEY = runtimeName('hp_time_validation_enabled');
+
+    const getStoredPreference = () => {
+      try {
+        return (
+          sessionStorage.getItem(TIME_PREF_KEY) ??
+          localStorage.getItem(TIME_PREF_KEY)
+        );
+      } catch (_error) {
+        void _error;
+        return null;
+      }
+    };
+
+    const preference = getStoredPreference();
+    let timeValidationEnabled = enableTimeValidation !== false && enableTimeValidation !== 'false';
+    if (preference === 'true') timeValidationEnabled = true;
+    if (preference === 'false') timeValidationEnabled = false;
+
+    const honeypots = container.querySelectorAll(
+      '.honeypot input, .honeypot textarea, .honeypot select'
+    );
+    const links = container.querySelectorAll('.honeypot a');
+
+    let humanInteractionDetected = false;
+    const pendingAutofill = new Set();
+
+    const flushPendingAutofill = () => {
+      if (pendingAutofill.size === 0) return;
+      pendingAutofill.forEach(element => {
+        if (element && typeof element.value === 'string') {
+          element.value = '';
+          element.removeAttribute('value');
+        }
+      });
+      pendingAutofill.clear();
+    };
+
+    const clearResidualValues = () => {
+      honeypots.forEach(field => {
+        if (field && typeof field.value === 'string' && field.value.trim() !== '') {
+          field.value = '';
+          field.removeAttribute('value');
+        }
+      });
+    };
+
+    const markHumanInteraction = () => {
+      if (humanInteractionDetected) return;
+      humanInteractionDetected = true;
+      document.removeEventListener('pointerdown', markHumanInteraction, true);
+      document.removeEventListener('keydown', markHumanInteraction, true);
+      document.removeEventListener('touchstart', markHumanInteraction, true);
+      flushPendingAutofill();
+      if (timeValidationEnabled) {
+        clearResidualValues();
+      }
+    };
+
+    document.addEventListener('pointerdown', markHumanInteraction, { passive: true, capture: true });
+    document.addEventListener('keydown', markHumanInteraction, { passive: true, capture: true });
+    document.addEventListener('touchstart', markHumanInteraction, { passive: true, capture: true });
+
+    const storage = {
+      set(key, value) {
+        try { localStorage.setItem(key, value); } catch (_error) { void _error; /* ignore storage errors */ }
+        try { sessionStorage.setItem(key, value); } catch (_error) { void _error; /* ignore storage errors */ }
+      }
+    };
+
+    const tripHoneypot = (reason, element, context = {}) => {
+      // Store detailed trip information
+      const tripData = {
+        reason,
+        variant,
+        timestamp: Date.now(),
+        element: element?.tagName?.toLowerCase() || 'unknown',
+        name: element?.name || element?.id || 'unknown',
+        userAgent: navigator.userAgent,
+        url: location.href,
+        ...context,
+      };
+
+      const payload = JSON.stringify(tripData);
+      storage.set(SHIELD_STORAGE_KEYS.honeypotTripped, payload);
+      storage.set(SHIELD_STORAGE_KEYS.honeypotReason, reason);
+
+      // Immediate redirect to gate with penalty
+      const next = encodeURIComponent(location.pathname + location.search);
+      location.replace(`/gate?hp=1&reason=${reason}&variant=${variant}&next=${next}`);
+    };
+
+    // Monitor all honeypot form elements
+    honeypots.forEach((element, index) => {
+      if (!element) return;
+
+      const elementId = `${variant}_${element.name || element.id || index}`;
+      const detailFor = (eventType) => `${eventType}_${elementId}`;
+      const metadataFor = (eventType) => ({ category: 'honeypot', event: detailFor(eventType) });
+
+      // Input monitoring
+      element.addEventListener('input', () => {
+        const detail = detailFor('input');
+        tripHoneypot(buildReason('honeypot', detail, elementId), element, metadataFor('input'));
+      }, { passive: true });
+
+      element.addEventListener('change', () => {
+        const detail = detailFor('change');
+        tripHoneypot(buildReason('honeypot', detail, elementId), element, metadataFor('change'));
+      }, { passive: true });
+
+      element.addEventListener('focus', () => {
+        const detail = detailFor('focus');
+        tripHoneypot(buildReason('honeypot', detail, elementId), element, metadataFor('focus'));
+      }, { passive: true });
+
+      element.addEventListener('click', () => {
+        const detail = detailFor('click');
+        tripHoneypot(buildReason('honeypot', detail, elementId), element, metadataFor('click'));
+      }, { passive: true });
+
+      element.addEventListener('keydown', () => {
+        const detail = detailFor('keydown');
+        tripHoneypot(buildReason('honeypot', detail, elementId), element, metadataFor('keydown'));
+      }, { passive: true });
+
+      // Monitor property access (advanced bot detection)
+      if (element.type === 'text' || element.type === 'email' || element.type === 'url') {
+        let originalValue = element.value;
+        Object.defineProperty(element, 'value', {
+          get: function() {
+            return originalValue;
+          },
+          set: function(newValue) {
+            if (newValue !== originalValue) {
+              if (humanInteractionDetected) {
+                const detail = detailFor('value_set');
+                tripHoneypot(buildReason('honeypot', detail, elementId), element, metadataFor('value_set'));
+              } else if (timeValidationEnabled && element) {
+                pendingAutofill.add(element);
+              }
+            }
+            originalValue = newValue;
+          }
+        });
+      }
+    });
+
+    // Monitor honeypot links
+    links.forEach((link, index) => {
+      if (!link) return;
+
+      const linkId = `${variant}_link_${index}`;
+
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const detail = `link_click_${linkId}`;
+        tripHoneypot(buildReason('decoy', detail, link.href || linkId), link, { category: 'decoy', event: detail });
+      });
+
+      link.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        const detail = `link_mousedown_${linkId}`;
+        tripHoneypot(buildReason('decoy', detail, link.href || linkId), link, { category: 'decoy', event: detail });
+      });
+
+      // Monitor href access
+      let originalHref = link.href;
+      Object.defineProperty(link, 'href', {
+        get: function() {
+          const detail = `link_href_access_${linkId}`;
+          tripHoneypot(buildReason('decoy', detail, link.href || linkId), link, { category: 'decoy', event: detail });
+          return originalHref;
+        },
+        set: function(newHref) {
+          originalHref = newHref;
+        }
+      });
+    });
+
+    // Time-based validation
+    const timestampField = container.querySelector('.hp-timestamp');
+    if (timeValidationEnabled && timestampField) {
+      const formLoadTime = parseInt(timestampField.value);
+      const now = Date.now();
+
+      // Check if form was filled too quickly (less than 2 seconds)
+      if (now - formLoadTime < 2000) {
+        setTimeout(() => {
+          if (!humanInteractionDetected) return;
+          // Check if any fields have been filled
+          const hasValues = Array.from(honeypots).some(field => field.value && field.value.trim() !== '');
+          if (hasValues) {
+            const detail = `too_fast_${variant}`;
+            tripHoneypot(
+              buildReason('honeypot', detail, 'time_check'),
+              timestampField,
+              { category: 'honeypot', event: detail }
+            );
+          }
+        }, 100);
+      }
+    }
+  });
+</script>

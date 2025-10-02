@@ -1,0 +1,19 @@
+{
+  "name": "@meeghele/astro-shield-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.1.0",
+  "workspaces": [
+    "core",
+    "app"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "test": "turbo run test"
+  },
+  "devDependencies": {
+    "turbo": "^2.1.2"
+  }
+}
