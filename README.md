@@ -133,78 +133,58 @@ interface AstroShieldOptions {
 }
 ```
 
-### Shield Configuration
-
-```typescript
-interface ShieldConfig {
-  // Proof-of-work settings
-  difficulty?: number;           // Mining difficulty (default: varies)
-  timeoutMs?: number;           // Max time to solve (default: varies)
-  minSolveDurationMs?: number;  // Minimum solve time to prevent precomputed solutions
-
-  // Token management
-  tokenTtlMinutes?: number;     // Token validity duration
-  nearMissThreshold?: number;   // Near-miss detection threshold
-  minAcceptable?: number;       // Minimum acceptable hash value
-  enableNearMisses?: boolean;   // Allow near-miss solutions
-
-  // Honeypot protection
-  enableHoneypots?: boolean;        // Enable honeypot traps
-  enableInputHoneypots?: boolean;   // Enable input field honeypots
-  enableLinkDecoys?: boolean;       // Enable decoy link honeypots
-  honeypotPenalty?: number;         // Penalty for triggering honeypots
-  maxPenaltyDiff?: number;          // Maximum penalty difficulty
-  honeypotPrefix?: string;          // Custom honeypot field prefix
-  decoyPrefix?: string;             // Custom decoy link prefix
-
-  // Validation
-  enableFinalCheck?: boolean;       // Enable final validation check
-  enableTimeValidation?: boolean;   // Validate solve duration
-
-  // UX
-  redirectTo?: string;              // Redirect destination after solving
-  redirectDelayMs?: number;         // Delay before redirect
-  showProgress?: boolean;           // Show solving progress
-  showDebugInfo?: boolean;          // Display debug information
-
-  // Advanced
-  shieldNamespace?: string;         // Custom localStorage namespace
-}
-```
-
 ### Default Settings
 
-All settings are optional. Here are the defaults:
+All settings are optional. Here are the defaults with descriptions:
 
 ```typescript
 {
-  // Integration defaults
-  gatePath: '/gate',
-  autoHideRoot: true,
+  // Integration settings
+  gatePath: '/gate',                  // Path to the gate page
+  autoHideRoot: true,                 // Redirect root to gate
 
-  // Shield defaults
+  // Shield settings
   shield: {
-    redirectTo: '/',
-    difficulty: 8,                    // Very easy - 8=very easy, 12=easy, 16=medium, 20=hard
-    timeoutMs: 10000,                 // 10 seconds
-    tokenTtlMinutes: 30,              // 30 minutes
-    nearMissThreshold: 4,
-    minAcceptable: 4,
-    enableNearMisses: true,
-    honeypotPenalty: 1,
-    maxPenaltyDiff: 16,
-    enableHoneypots: true,
-    enableInputHoneypots: true,
-    enableLinkDecoys: true,
-    enableFinalCheck: true,
-    enableTimeValidation: true,
-    honeypotPrefix: 'hp',
-    decoyPrefix: 'dc',
-    shieldNamespace: 'as',
-    redirectDelayMs: 500,             // 0.5 seconds
-    showProgress: true,
-    showDebugInfo: false,
-    minSolveDurationMs: 600,          // 0.6 seconds
+    // Proof-of-work settings
+    difficulty: 8,                    // PoW difficulty (8=very easy, 12=easy, 16=medium, 20=hard)
+    timeoutMs: 10000,                 // Max time to solve PoW (10 seconds)
+    minSolveDurationMs: 600,          // Minimum solve time to prevent precomputed solutions (0.6 seconds)
+
+    // Token management
+    tokenTtlMinutes: 30,              // Token validity duration (30 minutes)
+    nearMissThreshold: 4,             // Near-miss detection threshold for slow devices
+    minAcceptable: 4,                 // Minimum acceptable hash value
+    enableNearMisses: true,           // Allow near-miss solutions for slow devices
+
+    // Honeypot protection
+    enableHoneypots: true,            // Enable honeypot traps
+    enableInputHoneypots: true,       // Enable input field honeypots (hp1-hp5)
+    enableLinkDecoys: true,           // Enable decoy link honeypots (/admin, /login, etc.)
+    honeypotPenalty: 1,               // Penalty difficulty added for triggering honeypots
+    maxPenaltyDiff: 16,               // Maximum penalty difficulty
+    honeypotPrefix: 'hp',             // Custom honeypot field prefix for reason codes
+    decoyPrefix: 'dc',                // Custom decoy link prefix for reason codes
+
+    // Validation
+    enableFinalCheck: true,           // Enable final validation check before token creation
+    enableTimeValidation: true,       // Validate solve duration and timing
+
+    // UX settings
+    redirectTo: '/',                  // Redirect destination after solving
+    redirectDelayMs: 500,             // Delay before redirect (0.5 seconds)
+    showProgress: true,               // Show solving progress bar
+    showDebugInfo: false,             // Display debug information in console
+
+    // Theme colors (Gate component only)
+    darkBgColor: '#0e141b',           // Dark mode background color
+    darkTextColor: '#d6d3d1',         // Dark mode text color
+    darkBarColor: '#facc15',          // Dark mode progress bar color
+    lightBgColor: '#ffffff',          // Light mode background color
+    lightTextColor: '#374151',        // Light mode text color
+    lightBarColor: '#f97316',         // Light mode progress bar color
+
+    // Advanced
+    shieldNamespace: 'as',            // Custom localStorage namespace for token storage
   }
 }
 ```
