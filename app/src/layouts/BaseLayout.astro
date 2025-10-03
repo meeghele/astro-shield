@@ -16,7 +16,11 @@ const { title = "Astro Shield Testbed" } = Astro.props satisfies Props;
     <title>{title}</title>
     <meta name="robots" content="noindex,nofollow" />
     <meta name="color-scheme" content="light dark" />
+    <!-- Disable Dark Reader since we handle dark mode natively -->
+    <meta name="darkreader-lock" />
     <slot name="head" />
+
+
     <style>
       :root {
         font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
@@ -50,6 +54,7 @@ const { title = "Astro Shield Testbed" } = Astro.props satisfies Props;
           Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
         font-size: 0.95rem;
       }
+
     </style>
   </head>
   <body>
