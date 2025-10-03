@@ -192,6 +192,16 @@ All settings are optional. Here are the defaults with descriptions:
 }
 ```
 
+### Example Configurations
+
+- Development/Testing (no honeypots for clean testing): `{ difficulty: 4, timeoutMs: 20000, showDebugInfo: true, enableHoneypots: false }`
+- Light Protection (fast, user-friendly with basic honeypots): `{ difficulty: 8, timeoutMs: 10000, tokenTtlMinutes: 60, enableFinalCheck: false }`
+- Medium Protection (balanced with all honeypot types): `{ difficulty: 12, timeoutMs: 8000, tokenTtlMinutes: 30 }`
+- Strong Protection (slower, more secure with aggressive honeypots): `{ difficulty: 16, timeoutMs: 5000, honeypotPenalty: 3, maxPenaltyDiff: 20 }`
+- Maximum Protection (may frustrate some users): `{ difficulty: 20, timeoutMs: 3000, honeypotPenalty: 4, maxPenaltyDiff: 24 }`
+- Honeypot-Only Mode (no PoW, just honeypot detection): `{ difficulty: 0, timeoutMs: 1000, enableFinalCheck: true, enableInputHoneypots: true }`
+- No-Honeypot Mode (PoW only, for environments with form auto-fill issues): `{ difficulty: 12, enableHoneypots: false }`
+
 ## Protecting Images
 
 The `<ShieldedImage>` component prevents images from loading in the browser until the user passes the gate:
