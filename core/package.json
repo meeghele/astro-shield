@@ -1,7 +1,7 @@
 {
   "name": "@meeghele/astro-shield",
-  "version": "0.0.5",
-  "description": "Proof-of-work gate with honeypot and decoy link protection for Astro sites.",
+  "version": "0.0.6",
+  "description": "Proof-of-work obfuscation gate with honeypot and decoy link protection for Astro sites.",
   "type": "module",
   "license": "MIT",
   "author": "Michele Tavella <meeghele@proton.me>",
