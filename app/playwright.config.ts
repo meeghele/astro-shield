@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const PORT = 5000;
-const HOST = "localhost";
+const HOST = "127.0.0.1";
 const BASE_URL = `http://${HOST}:${PORT}`;
 const MODULE_DIR = fileURLToPath(new URL(".", import.meta.url));
 

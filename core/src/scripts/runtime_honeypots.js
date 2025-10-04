@@ -47,6 +47,10 @@
   let SHIELD_STORAGE_KEYS = {};
   let HONEYPOT_PREFIX = "hp";
   let DECOY_PREFIX = "dc";
+  let HONEYPOT_IDS = ["hp1", "hp2", "hp3", "hp4", "hp5"];
+  let DECOY_IDS = ["decoy1", "decoy2", "decoy3"];
+  let HONEYPOT_CLASS = "honeypot";
+  let HONEYPOT_STYLE_CLASSES = ["hp", "hp-visible", "hp-css"];
 
   const refreshStorageKeys = () => {
     SHIELD_STORAGE_KEYS = {
@@ -63,6 +67,10 @@
     PRODUCT_NAMESPACE = sanitizeNamespace(config.shieldNamespace, "as");
     HONEYPOT_PREFIX = sanitizePrefix(config.honeypotPrefix, "hp");
     DECOY_PREFIX = sanitizePrefix(config.decoyPrefix, "dc");
+    HONEYPOT_IDS = Array.isArray(config.honeypotIds) ? config.honeypotIds : HONEYPOT_IDS;
+    DECOY_IDS = Array.isArray(config.decoyIds) ? config.decoyIds : DECOY_IDS;
+    HONEYPOT_CLASS = typeof config.honeypotClass === "string" ? config.honeypotClass : HONEYPOT_CLASS;
+    HONEYPOT_STYLE_CLASSES = Array.isArray(config.honeypotStyleClasses) ? config.honeypotStyleClasses : HONEYPOT_STYLE_CLASSES;
     GATE_PATH = sanitizeGatePath(config.gatePath, "/gate");
     refreshStorageKeys();
   };
@@ -120,12 +128,13 @@
     for (const img of document.querySelectorAll("img[data-src]")) {
       img.src = img.dataset.src;
       img.removeAttribute("data-src");
+      img.removeAttribute("data-guarded");
     }
   };
 
   const queryHoneypotElements = () => ({
     honeypots: document.querySelectorAll(
-      '.honeypot, input[name="website"], input[name="email2"], input[name="url"]',
+      `.${HONEYPOT_CLASS}, input[name="website"], input[name="email2"], input[name="url"]`,
     ),
     decoyLinks: document.querySelectorAll(
       'a[href*="/admin"], a[href*="/login"], a[href*="/download"]:not([href^="http"])',
@@ -312,7 +321,13 @@
     idleTimeoutId = setupIdleTimeout(tripHoneypot, interactionTracking);
   };
 
-  const bootstrap = () => initRuntimeHoneypots();
+  const bootstrap = () => {
+    initRuntimeHoneypots();
+    // Check if already unlocked and load images
+    if (window.__ASTRO_SHIELD_READY__) {
+      loadDeferredImages();
+    }
+  };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bootstrap, { once: true });
@@ -320,5 +335,21 @@
     bootstrap();
   }
 
-  document.addEventListener("astro:page-load", initRuntimeHoneypots);
+  document.addEventListener("astro:page-load", () => {
+    initRuntimeHoneypots();
+    // Check if already unlocked on page load
+    if (window.__ASTRO_SHIELD_READY__) {
+      loadDeferredImages();
+    }
+  });
+
+  // Listen for unlock event to load deferred images
+  document.addEventListener("astro-shield:unlocked", () => {
+    loadDeferredImages();
+  });
+
+  // Also listen for gate success events
+  window.addEventListener("astro-shield:gate-success", () => {
+    loadDeferredImages();
+  });
 })();

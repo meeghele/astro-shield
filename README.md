@@ -7,16 +7,16 @@
 
 > **⚠️ Warning:** Still under development.
 
-Proof-of-work (PoW) gate with honeypot and decoy link protection for Astro sites. A minimal integration that adds multi-layered client-side bot protection without requiring external services.
+Proof-of-work (PoW) gate with honeypot and content obfuscation for Astro sites. A minimal integration that deters automated scrapers through client-side challenges without requiring external services.
 
 ## Overview
 
-Astro Shield is a client-side protection layer designed to defend static websites from automated scrapers and basic bots. It verifies visitors through computational challenges that run entirely in the browser, requiring no backend infrastructure, no APIs, or third-party services.
+Astro Shield is a client-side obfuscation layer designed to deter automated scrapers and basic bots from static websites. It verifies visitors through computational challenges that run entirely in the browser, requiring no backend infrastructure, no APIs, or third-party services.
 
 ### What it protects against
 
 - ✅ Simple scrapers and automated tools with JavaScript execution
-- ✅ Basic crawlers without JavaScript capability (cannot render the gate page)
+- ✅ Basic crawlers without JavaScript capability (cannot render shielded content)
 - ✅ Automated form submissions and content harvesting
 - ✅ Unsophisticated bot traffic that floods small independent sites
 
@@ -45,7 +45,7 @@ Astro Shield is a client-side protection layer designed to defend static website
 - **[Anubis](https://github.com/TecharoHQ/anubis)**: Open-source backend firewall utility that validates connections before they reach your server, with configurable bot policies and allowlisting
 - **[Cloudflare](https://www.cloudflare.com/)**: Enterprise-grade CDN with advanced bot management, DDoS protection, and WAF capabilities
 
-This is a **deterrent-focused approach** that raises the cost of automated access. It won't stop determined adversaries, but it will significantly reduce noise from the vast majority of unsophisticated scrapers that target the independent web.
+This is a **client-side obfuscation and deterrent approach** that raises the cost of automated access. It won't stop determined adversaries, but it will significantly reduce noise from the vast majority of unsophisticated scrapers that target the independent web.
 
 ## Features
 
@@ -57,6 +57,7 @@ This is a **deterrent-focused approach** that raises the cost of automated acces
 - **Fully Type-Safe**: Complete TypeScript support
 - **Configurable**: Flexible options for difficulty, timeouts, and behavior
 - **Auto-Hide Root**: Optionally redirect the root page to the gate
+- **Shielded Content Blocks**: Wrap critical markup so it only renders after the gate validates
 - **Native Astro Integration**: Seamless setup with Astro's integration system
 
 ## How It Works
@@ -164,8 +165,15 @@ All settings are optional. Here are the defaults with descriptions:
     enableLinkDecoys: true,           // Enable decoy link honeypots (/admin, /login, etc.)
     honeypotPenalty: 1,               // Penalty difficulty added for triggering honeypots
     maxPenaltyDiff: 16,               // Maximum penalty difficulty
-    honeypotPrefix: 'hp',             // Custom honeypot field prefix for reason codes
-    decoyPrefix: 'dc',                // Custom decoy link prefix for reason codes
+    honeypotPrefix: 'hp',             // Honeypot reason code prefix (obfuscatable)
+    decoyPrefix: 'dc',                // Decoy reason code prefix (obfuscatable)
+    shieldNamespace: 'as',            // localStorage namespace (obfuscatable)
+
+    // Honeypot/decoy element customization (for obfuscation)
+    honeypotIds: ['hp1', 'hp2', 'hp3', 'hp4', 'hp5'],  // Element IDs for honeypot inputs (obfuscatable)
+    decoyIds: ['decoy1', 'decoy2', 'decoy3'],          // Element IDs for decoy links (obfuscatable)
+    honeypotClass: 'honeypot',                         // CSS class for runtime querying (obfuscatable)
+    honeypotStyleClasses: ['hp', 'hp-visible', 'hp-css'],  // CSS style classes (obfuscatable)
 
     // Validation
     enableFinalCheck: true,           // Enable final validation check before token creation
@@ -185,9 +193,6 @@ All settings are optional. Here are the defaults with descriptions:
     lightTextColor: '#374151',        // Light mode text color
     lightBarColor: '#f97316',         // Light mode progress bar color
     themeClassName: 'theme-sleek',    // Theme class name for dark/light mode compatibility
-
-    // Advanced
-    shieldNamespace: 'as',            // Custom localStorage namespace for token storage
   }
 }
 ```
@@ -201,6 +206,30 @@ All settings are optional. Here are the defaults with descriptions:
 - Maximum Protection (may frustrate some users): `{ difficulty: 20, timeoutMs: 3000, honeypotPenalty: 4, maxPenaltyDiff: 24 }`
 - Honeypot-Only Mode (no PoW, just honeypot detection): `{ difficulty: 0, timeoutMs: 1000, enableFinalCheck: true, enableInputHoneypots: true }`
 - No-Honeypot Mode (PoW only, for environments with form auto-fill issues): `{ difficulty: 12, enableHoneypots: false }`
+- Obfuscated Honeypots (harder for bots to detect): `{ honeypotIds: ['backup_email', 'alt_contact', 'secondary_url', 'prefs_newsletter', 'extra_comments'], decoyIds: ['help_link', 'support_portal', 'resources'] }`
+
+## Shielding Page Content
+
+`<ShieldedContent>` keeps critical markup inside a `<template>` until the gate script unlocks the page. Users with JavaScript disabled see a friendly fallback message, while bots that fetch raw HTML never get the rendered content.
+
+```astro
+---
+import ShieldedContent from '@meeghele/astro-shield/components/ShieldedContent.astro';
+---
+
+<ShieldedContent fallback="Please enable JavaScript to continue.">
+  <main>
+    <h1>Protected area</h1>
+    <p>Only visible after the PoW gate passes.</p>
+  </main>
+</ShieldedContent>
+```
+
+- Content is delivered inside a `<template>` so non-JS clients cannot render it.
+- The fallback message remains visible when scripts are blocked.
+- Once the gate validates a token, the runtime dispatches an `astro-shield:unlocked` event and `<ShieldedContent>` swaps the real markup into the DOM.
+
+> **Important:** This is content **obfuscation**, not access control. The HTML ships in the response inside `<template>` tags. Determined scrapers that parse templates or extract data attributes can bypass this entirely. Use this to deter unsophisticated bots, not to secure sensitive content.
 
 ## Protecting Images
 
@@ -225,6 +254,59 @@ import myImage from '../assets/photo.jpg';
 - A placeholder is shown initially
 - Once the user passes the gate and has a valid token, JavaScript swaps `data-src` to `src` and loads the image
 - Right-click, drag-and-drop, and other browser shortcuts are disabled
+
+## Obfuscating Honeypot/Decoy Elements
+
+By default, honeypot elements use obvious IDs and prefixes like `hp1`, `hp2`, `decoy1`, `as` (namespace), `hp` (prefix), `dc` (decoy prefix) which sophisticated bots can recognize. You can customize these to make them less detectable:
+
+### Manual Obfuscation
+
+```typescript
+{
+  // Use innocuous-looking IDs instead of obvious ones
+  honeypotIds: ['backup_email', 'alt_contact', 'secondary_url', 'prefs_newsletter', 'extra_comments'],
+  decoyIds: ['help_link', 'support_portal', 'resources'],
+  honeypotClass: 'field-optional',
+  honeypotStyleClasses: ['visually-hidden', 'sr-only', 'offscreen'],
+
+  // Obfuscate prefixes and namespace
+  shieldNamespace: 'myapp',        // Default: 'as'
+  honeypotPrefix: 'trap',          // Default: 'hp'
+  decoyPrefix: 'bait',             // Default: 'dc'
+}
+```
+
+**Important:** All five honeypot IDs and all three decoy IDs must be provided if you customize them. The array length must match the defaults.
+
+### Automatic Build-Time Randomization (Recommended)
+
+For maximum security, generate random values at build time so they change with every deployment:
+
+```typescript
+import { randomBytes } from 'crypto';
+
+const generateRandomString = (length = 8) =>
+  randomBytes(length).toString('hex').slice(0, length);
+
+export default defineConfig({
+  integrations: [
+    astroShield({
+      shield: {
+        // Generate random values on each build
+        shieldNamespace: generateRandomString(),
+        honeypotPrefix: generateRandomString(),
+        decoyPrefix: generateRandomString(),
+        honeypotIds: Array.from({ length: 5 }, () => generateRandomString(10)),
+        decoyIds: Array.from({ length: 3 }, () => generateRandomString(10)),
+        honeypotClass: generateRandomString(12),
+        honeypotStyleClasses: Array.from({ length: 3 }, () => generateRandomString(12)),
+      }
+    })
+  ]
+});
+```
+
+This approach makes it nearly impossible for bots to fingerprint your honeypot elements since they change with every build.
 
 ### Important limitations
 

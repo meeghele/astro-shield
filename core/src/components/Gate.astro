@@ -28,6 +28,11 @@ const {
   honeypotPrefix = 'hp',          // Prefix used in honeypot reason codes (customizable)
   decoyPrefix = 'dc',             // Prefix used in link decoy reason codes (customizable)
   shieldNamespace = 'as',         // Namespace used for storage keys and reason codes
+  // Honeypot/decoy element customization
+  honeypotIds = ['hp1', 'hp2', 'hp3', 'hp4', 'hp5'],  // Element IDs for honeypot inputs
+  decoyIds = ['decoy1', 'decoy2', 'decoy3'],          // Element IDs for decoy links
+  honeypotClass = 'honeypot',                         // CSS class for runtime querying
+  honeypotStyleClasses = ['hp', 'hp-visible', 'hp-css'],  // CSS classes for styling variants
   redirectDelayMs = 500,          // Delay before redirecting after success
   // UI settings
   showProgress = true,      // Show progress bar
@@ -43,7 +48,7 @@ const {
 } = Astro.props;
 ---
 
-<html class={themeClassName} lang="en">
+<html class={`${themeClassName} no-js`} lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -58,6 +63,9 @@ const {
     <!-- Theme detection - must run before styles apply to prevent FOUC -->
     <script is:inline>
       (function () {
+        // Mark that JavaScript is enabled
+        document.documentElement.classList.remove('no-js');
+
         const THEME_KEY = "theme";
 
         const getStoredTheme = () => {
@@ -170,32 +178,6 @@ const {
         }
       }
 
-      .hp {
-        position: absolute !important;
-        left: -10000px !important;
-        top: auto !important;
-        width: 1px !important;
-        height: 1px !important;
-        overflow: hidden !important;
-        clip: rect(1px, 1px, 1px, 1px) !important;
-        white-space: nowrap !important;
-        opacity: 0 !important;
-        visibility: hidden !important;
-      }
-
-      .hp-visible {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-      }
-
-      .hp-css {
-        color: transparent !important;
-        background: transparent !important;
-        border: none !important;
-        font-size: 0 !important;
-      }
-
       [data-role="gate-status-code"] {
         display: none !important;
       }
@@ -280,6 +262,35 @@ const {
         color: var(--darkBarColor);
       }
     </style>
+
+    <!-- Honeypot styles with dynamic class names -->
+    <style is:inline set:html={`
+      .${honeypotStyleClasses[0]} {
+        position: absolute !important;
+        left: -10000px !important;
+        top: auto !important;
+        width: 1px !important;
+        height: 1px !important;
+        overflow: hidden !important;
+        clip: rect(1px, 1px, 1px, 1px) !important;
+        white-space: nowrap !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+      }
+
+      .${honeypotStyleClasses[1]} {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+      }
+
+      .${honeypotStyleClasses[2]} {
+        color: transparent !important;
+        background: transparent !important;
+        border: none !important;
+        font-size: 0 !important;
+      }
+    `} />
   </head>
   <body>
     <div class="gate">
@@ -319,32 +330,32 @@ const {
       </div>
 
       {enableHoneypots && enableInputHoneypots && (
-        <>
+        <div
+          aria-hidden="true"
+          style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;clip:rect(1px, 1px, 1px, 1px);opacity:0;"
+        >
           <!-- Multiple honeypot types -->
-          <input id="hp1" class="hp" name="website" autocomplete="off" tabindex="-1" aria-hidden="true" placeholder="Leave empty" />
-          <input id="hp2" class="hp" name="email2" type="email" autocomplete="off" tabindex="-1" aria-hidden="true" placeholder="Alternative email" />
-          <input id="hp3" class="hp" name="url" type="url" autocomplete="off" tabindex="-1" aria-hidden="true" placeholder="Website URL" />
-          <div class="hp-visible">
-            <input id="hp4" name="confirm_human" type="checkbox" tabindex="-1" />
-            <label for="hp4">Check this box to confirm you are human</label>
+          <input id={honeypotIds[0]} class={honeypotStyleClasses[0]} name="website" autocomplete="off" tabindex="-1" aria-hidden="true" placeholder="Leave empty" />
+          <input id={honeypotIds[1]} class={honeypotStyleClasses[0]} name="email2" type="email" autocomplete="off" tabindex="-1" aria-hidden="true" placeholder="Alternative email" />
+          <input id={honeypotIds[2]} class={honeypotStyleClasses[0]} name="url" type="url" autocomplete="off" tabindex="-1" aria-hidden="true" placeholder="Website URL" />
+          <div class={honeypotStyleClasses[1]} aria-hidden="true">
+            <input id={honeypotIds[3]} name="confirm_human" type="checkbox" tabindex="-1" aria-hidden="true" />
+            <label for={honeypotIds[3]} aria-hidden="true">Check this box to confirm you are human</label>
           </div>
-          <input id="hp5" class="hp-css" name="comments" tabindex="-1" aria-hidden="true" placeholder="Comments" />
-        </>
+          <input id={honeypotIds[4]} class={honeypotStyleClasses[2]} name="comments" tabindex="-1" aria-hidden="true" placeholder="Comments" />
+        </div>
       )}
 
       {enableHoneypots && enableLinkDecoys && (
-        <>
-          <a id="decoy1" href="/admin" class="hp" aria-hidden="true">Admin Panel</a>
-          <a id="decoy2" href="/login" class="hp" aria-hidden="true">Login</a>
-          <a id="decoy3" href="/download" class="hp" aria-hidden="true">Download</a>
-        </>
+        <div
+          aria-hidden="true"
+          style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;clip:rect(1px, 1px, 1px, 1px);opacity:0;"
+        >
+          <a id={decoyIds[0]} href="/admin" class={honeypotStyleClasses[0]} aria-hidden="true">Admin Panel</a>
+          <a id={decoyIds[1]} href="/login" class={honeypotStyleClasses[0]} aria-hidden="true">Login</a>
+          <a id={decoyIds[2]} href="/download" class={honeypotStyleClasses[0]} aria-hidden="true">Download</a>
+        </div>
       )}
-
-      <noscript>
-        <p style="color: var(--color-primary-main, #f97316); font-weight: 600; margin-top: 20px;">
-          Please enable JavaScript. This security check requires JavaScript to verify you're not a bot.
-        </p>
-      </noscript>
     </div>
 
     <script is:inline define:vars={{
@@ -364,6 +375,10 @@ const {
       honeypotPrefix,
       decoyPrefix,
       shieldNamespace,
+      honeypotIds,
+      decoyIds,
+      honeypotClass,
+      honeypotStyleClasses,
       redirectDelayMs,
       showDebugInfo,
       redirectTo,
@@ -441,6 +456,10 @@ const {
             shieldNamespace: SHIELD_NAMESPACE,
             honeypotPrefix: HONEYPOT_PREFIX,
             decoyPrefix: DECOY_PREFIX,
+            honeypotIds,
+            decoyIds,
+            honeypotClass,
+            honeypotStyleClasses,
           };
 
           window.__ASTRO_SHIELD_CONFIG__ = {
@@ -664,10 +683,10 @@ const {
 
         // Get honeypot elements (only if honeypots are enabled)
         const honeypots = enableHoneypots && enableInputHoneypots
-          ? ['hp1', 'hp2', 'hp3', 'hp4', 'hp5'].map(id => document.getElementById(id)).filter(el => el)
+          ? honeypotIds.map(id => document.getElementById(id)).filter(el => el)
           : [];
         const decoys = enableHoneypots && enableLinkDecoys
-          ? ['decoy1', 'decoy2', 'decoy3'].map(id => document.getElementById(id)).filter(el => el)
+          ? decoyIds.map(id => document.getElementById(id)).filter(el => el)
           : [];
 
         const touchedHoneypots = new WeakSet();
@@ -872,6 +891,28 @@ const {
         tick(100);
         setStatus('pow-complete', { progress: 100 });
         debugLog('complete', 'Challenge complete; scheduling redirect', { NEXT, redirectDelayMs });
+
+        // Notify parent window that gate was successfully completed
+        if (window.parent && window.parent !== window) {
+          try {
+            window.parent.postMessage(
+              { type: 'astro-shield:gate-success', timestamp: Date.now() },
+              '*'
+            );
+          } catch (_error) {
+            void _error;
+          }
+        }
+
+        // Also dispatch event in current window
+        try {
+          window.dispatchEvent(new CustomEvent('astro-shield:gate-success', {
+            detail: { ready: true, timestamp: Date.now() },
+            bubbles: true
+          }));
+        } catch (_error) {
+          void _error;
+        }
 
         setTimeout(() => {
           setStatus('redirecting');

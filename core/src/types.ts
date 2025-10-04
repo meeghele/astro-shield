@@ -19,6 +19,11 @@ export interface ShieldConfig {
   honeypotPrefix?: string;
   decoyPrefix?: string;
   shieldNamespace?: string;
+  // Honeypot/decoy element customization
+  honeypotIds?: string[];
+  decoyIds?: string[];
+  honeypotClass?: string;
+  honeypotStyleClasses?: string[];
   redirectDelayMs?: number;
   showProgress?: boolean;
   showDebugInfo?: boolean;

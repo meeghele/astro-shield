@@ -7,8 +7,185 @@
 (function () {
   let redirectScheduled = false;
   let redirectTarget = null;
+  let readyState = null;
+  let documentReadyCallbacks = [];
 
   const CONFIG_STORAGE_KEY = "__ASTRO_SHIELD_CONFIG_OVERRIDES__";
+
+  const SHIELD_EVENTS = Object.freeze({
+    unlocked: "astro-shield:unlocked",
+    locked: "astro-shield:locked",
+  });
+
+  const whenDocumentReady = (callback) => {
+    if (document.readyState === "loading") {
+      documentReadyCallbacks.push(callback);
+    } else {
+      callback();
+    }
+  };
+
+  const toggleDocumentState = (state) => {
+    if (readyState === state) {
+      return;
+    }
+    readyState = state;
+    try {
+      if (typeof window !== "undefined") {
+        window.__ASTRO_SHIELD_READY__ = state;
+      }
+      if (typeof document !== "undefined") {
+        document.documentElement.toggleAttribute(
+          "data-astro-shield-ready",
+          Boolean(state),
+        );
+        document.documentElement.toggleAttribute(
+          "data-astro-shield-locked",
+          !state,
+        );
+        const eventName = state
+          ? SHIELD_EVENTS.unlocked
+          : SHIELD_EVENTS.locked;
+        document.dispatchEvent(
+          new CustomEvent(eventName, {
+            detail: { ready: state },
+            bubbles: true,
+          }),
+        );
+        if (state) {
+          unlockManagedShieldBlocks();
+        }
+      }
+    } catch (_error) {
+      void _error;
+    }
+  };
+
+  const setDocumentVisibility = (visible) => {
+    if (typeof document === "undefined") {
+      return;
+    }
+    document.documentElement.style.visibility = visible ? "visible" : "";
+  };
+
+  const SHIELD_BLOCK_SELECTOR = "[data-astro-shield-block]";
+  const SHIELD_TEMPLATE_SELECTOR = "template[data-astro-shield-template]";
+  const SHIELD_CONTENT_SELECTOR = "[data-astro-shield-content]";
+  const managedShieldBlocks = new Map();
+
+  const showContentHost = (contentHost) => {
+    if (!contentHost) {
+      return;
+    }
+    contentHost.hidden = false;
+    contentHost.removeAttribute("hidden");
+  };
+
+  const unlockShieldBlock = (state) => {
+    if (!state || state.unlocked) {
+      return;
+    }
+
+    const { block, contentHost } = state;
+
+    if (state.template) {
+      try {
+        const fragment = state.template.content.cloneNode(true);
+        contentHost?.append(fragment);
+      } catch (_error) {
+        void _error;
+      }
+      state.template.remove();
+      state.template = null;
+    }
+
+    if (block) {
+      block.dataset.astroShieldUnlocked = "true";
+    }
+
+    showContentHost(contentHost);
+
+    state.unlocked = true;
+  };
+
+  const ensureShieldBlock = (block) => {
+    if (!(block instanceof HTMLElement) || managedShieldBlocks.has(block)) {
+      return;
+    }
+
+    const template = block.querySelector(SHIELD_TEMPLATE_SELECTOR);
+    const contentHost = block.querySelector(SHIELD_CONTENT_SELECTOR);
+
+    const state = {
+      block,
+      template,
+      contentHost,
+      unlocked:
+        block.dataset.astroShieldUnlocked === "true" ||
+        !template ||
+        !contentHost,
+    };
+
+    managedShieldBlocks.set(block, state);
+
+    if (state.unlocked) {
+      showContentHost(contentHost);
+      return;
+    }
+
+    if (typeof window !== "undefined" && window.__ASTRO_SHIELD_READY__) {
+      unlockShieldBlock(state);
+    }
+  };
+
+  const scanShieldBlocks = () => {
+    if (typeof document === "undefined") {
+      return;
+    }
+    const blocks = document.querySelectorAll(SHIELD_BLOCK_SELECTOR);
+    blocks.forEach((block) => ensureShieldBlock(block));
+  };
+
+  const unlockManagedShieldBlocks = () => {
+    for (const state of managedShieldBlocks.values()) {
+      unlockShieldBlock(state);
+    }
+  };
+
+  const refreshShieldBlocks = () => {
+    scanShieldBlocks();
+    if (typeof window !== "undefined" && window.__ASTRO_SHIELD_READY__) {
+      unlockManagedShieldBlocks();
+    }
+  };
+
+  const setupShieldBlockObserver = () => {
+    if (typeof MutationObserver === "undefined" || typeof document === "undefined") {
+      return;
+    }
+
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (!(node instanceof HTMLElement)) {
+            continue;
+          }
+          if (node.matches(SHIELD_BLOCK_SELECTOR)) {
+            ensureShieldBlock(node);
+          }
+          const descendants = node.querySelectorAll?.(SHIELD_BLOCK_SELECTOR);
+          if (descendants && descendants.length) {
+            descendants.forEach((descendant) => ensureShieldBlock(descendant));
+          }
+        }
+      }
+    });
+
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
+  };
 
   const getStorages = () => {
     if (typeof window === "undefined") {
@@ -148,12 +325,20 @@
     resolvedConfig.autoHideRoot !== false &&
     typeof document !== "undefined"
   ) {
-    document.documentElement.style.visibility = "hidden";
+    setDocumentVisibility(false);
   }
 
   if (typeof window !== "undefined") {
     window.__ASTRO_SHIELD_CONFIG__ = resolvedConfig;
   }
+
+  // Setup DOM-dependent features when ready
+  whenDocumentReady(() => {
+    setupShieldBlockObserver();
+    refreshShieldBlocks();
+  });
+
+  toggleDocumentState(false);
 
   persistOverrides({
     gatePath: GATE_PATH,
@@ -288,12 +473,15 @@
     const currentPath = location.pathname;
 
     if (isPathExempt(currentPath, exemptPaths)) {
-      document.documentElement.style.visibility = "visible";
+      toggleDocumentState(false);
+      setDocumentVisibility(true);
       return;
     }
 
     const honeypotActive = checkHoneypots();
     if (!hasValidToken() || honeypotActive) {
+      toggleDocumentState(false);
+      setDocumentVisibility(false);
       const gateUrl = buildGateRedirectUrl(
         GATE_PATH,
         currentPath,
@@ -303,12 +491,48 @@
       return;
     }
 
-    document.documentElement.style.visibility = "visible";
+    toggleDocumentState(true);
+    setDocumentVisibility(true);
   };
 
-  runGateCheck();
-  document.addEventListener("astro:page-load", runGateCheck);
-  document.addEventListener("astro:after-swap", () => {
-    document.documentElement.style.visibility = "visible";
+  const handlePageLoad = () => {
+    runGateCheck();
+    refreshShieldBlocks();
+  };
+
+  // Handle initial DOM ready state
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      // Process any queued callbacks
+      documentReadyCallbacks.forEach(callback => callback());
+      documentReadyCallbacks = [];
+
+      // Run initial gate check
+      runGateCheck();
+    });
+  } else {
+    // DOM is already ready, run check immediately
+    runGateCheck();
+  }
+
+  // Listen for Astro navigation events
+  whenDocumentReady(() => {
+    document.addEventListener("astro:page-load", handlePageLoad);
+    document.addEventListener("astro:after-swap", () => {
+      refreshShieldBlocks();
+      setDocumentVisibility(true);
+    });
+    document.addEventListener(SHIELD_EVENTS.unlocked, refreshShieldBlocks);
+  });
+
+  // Listen for unlock messages from gate iframe/window
+  window.addEventListener("message", (event) => {
+    if (event.data && event.data.type === "astro-shield:gate-success") {
+      // Re-check token and unlock if valid
+      if (hasValidToken()) {
+        toggleDocumentState(true);
+        setDocumentVisibility(true);
+      }
+    }
   });
 })();

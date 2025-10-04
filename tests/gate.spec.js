@@ -14,6 +14,10 @@ import {
   DEFAULT_TIMEOUTS,
 } from "./utils/gate-test-helpers.js";
 
+// Default honeypot/decoy IDs (configurable in Shield config)
+const DEFAULT_HONEYPOT_IDS = ["hp1", "hp2", "hp3", "hp4", "hp5"];
+const DEFAULT_DECOY_IDS = ["decoy1", "decoy2", "decoy3"];
+
 /**
  * Gate Security Challenge - Basic Functionality Tests
  *
@@ -134,37 +138,116 @@ test.describe("Gate Security Challenge", () => {
   test("5. Honeypot elements are hidden from users", async ({ page }) => {
     await page.goto("/gate?next=/", { waitUntil: "domcontentloaded" });
 
+    // Wait for the gate UI to be ready
+    await expect(page.locator(gateSelectors.container)).toBeVisible({ timeout: 3000 });
+
     // Most honeypot inputs have aria-hidden and tabindex attributes
-    const standardHoneypots = ["#hp1", "#hp2", "#hp3", "#hp5"];
+    const standardHoneypots = [DEFAULT_HONEYPOT_IDS[0], DEFAULT_HONEYPOT_IDS[1], DEFAULT_HONEYPOT_IDS[2], DEFAULT_HONEYPOT_IDS[4]];
     for (const hp of standardHoneypots) {
-      const element = page.locator(hp);
-      await expect(element).toBeAttached();
-      await expect(element).toHaveAttribute("aria-hidden", "true");
-      await expect(element).toHaveAttribute("tabindex", "-1");
+      const element = page.locator(`#${hp}`);
+      await expect(element).toBeAttached({ timeout: 2000 });
+      await expect(element).toHaveAttribute("aria-hidden", "true", { timeout: 1000 });
+      await expect(element).toHaveAttribute("tabindex", "-1", { timeout: 1000 });
     }
 
-    // hp4 is the checkbox honeypot - it has tabindex but aria-hidden is on parent
-    const hp4 = page.locator("#hp4");
-    await expect(hp4).toBeAttached();
-    await expect(hp4).toHaveAttribute("tabindex", "-1");
-    await expect(hp4).toHaveAttribute("type", "checkbox");
+    // hp4 is the checkbox honeypot - it has tabindex, and its label has aria-hidden
+    const hp4 = page.locator(`#${DEFAULT_HONEYPOT_IDS[3]}`);
+    await expect(hp4).toBeAttached({ timeout: 2000 });
+    await expect(hp4).toHaveAttribute("tabindex", "-1", { timeout: 1000 });
+    await expect(hp4).toHaveAttribute("type", "checkbox", { timeout: 1000 });
+
+    // hp4 label should have aria-hidden
+    const hp4Label = page.locator(`label[for="${DEFAULT_HONEYPOT_IDS[3]}"]`);
+    await expect(hp4Label).toBeAttached({ timeout: 2000 });
+    await expect(hp4Label).toHaveAttribute("aria-hidden", "true", { timeout: 1000 });
 
     // Decoy links should have proper hiding attributes
-    const decoys = ["#decoy1", "#decoy2", "#decoy3"];
-    for (const decoy of decoys) {
-      const element = page.locator(decoy);
-      await expect(element).toBeAttached();
-      await expect(element).toHaveAttribute("aria-hidden", "true");
+    for (const decoyId of DEFAULT_DECOY_IDS) {
+      const element = page.locator(`#${decoyId}`);
+      await expect(element).toBeAttached({ timeout: 2000 });
+      await expect(element).toHaveAttribute("aria-hidden", "true", { timeout: 1000 });
     }
   });
 
-  test("6. Honeypots have event listeners attached", async ({ page }) => {
+  test("6. Honeypot elements are visually invisible (positioned off-screen)", async ({ page }) => {
+    await page.goto("/gate?next=/", { waitUntil: "domcontentloaded" });
+
+    // Check that honeypot inputs are positioned off-screen or hidden
+    const offScreenHoneypots = [DEFAULT_HONEYPOT_IDS[0], DEFAULT_HONEYPOT_IDS[1], DEFAULT_HONEYPOT_IDS[2]];
+    for (const hp of offScreenHoneypots) {
+      const element = page.locator(`#${hp}`);
+      const styles = await element.evaluate((el) => {
+        const computed = window.getComputedStyle(el);
+        return {
+          position: computed.position,
+          left: computed.left,
+          visibility: computed.visibility,
+          opacity: computed.opacity,
+        };
+      });
+
+      // These elements use position: absolute with left: -10000px
+      expect(styles.position).toBe("absolute");
+      expect(styles.left).toBe("-10000px");
+      expect(styles.visibility).toBe("hidden");
+      expect(styles.opacity).toBe("0");
+    }
+
+    // hp4 checkbox and label are inside a display:none container
+    const hp4Container = page.locator(`#${DEFAULT_HONEYPOT_IDS[3]}`).locator("..");
+    const containerStyles = await hp4Container.evaluate((el) => {
+      const computed = window.getComputedStyle(el);
+      return {
+        display: computed.display,
+        visibility: computed.visibility,
+        opacity: computed.opacity,
+      };
+    });
+    expect(containerStyles.display).toBe("none");
+    expect(containerStyles.visibility).toBe("hidden");
+    expect(containerStyles.opacity).toBe("0");
+
+    // hp5 uses transparent text styling
+    const hp5 = page.locator(`#${DEFAULT_HONEYPOT_IDS[4]}`);
+    const hp5Styles = await hp5.evaluate((el) => {
+      const computed = window.getComputedStyle(el);
+      return {
+        color: computed.color,
+        background: computed.background,
+        fontSize: computed.fontSize,
+      };
+    });
+    // "transparent" is computed as "rgba(0, 0, 0, 0)" by browsers
+    expect(hp5Styles.color).toBe("rgba(0, 0, 0, 0)");
+    expect(hp5Styles.fontSize).toBe("0px");
+
+    // Decoy links should be positioned off-screen like hp1-3
+    for (const decoyId of DEFAULT_DECOY_IDS) {
+      const element = page.locator(`#${decoyId}`);
+      const styles = await element.evaluate((el) => {
+        const computed = window.getComputedStyle(el);
+        return {
+          position: computed.position,
+          left: computed.left,
+          visibility: computed.visibility,
+          opacity: computed.opacity,
+        };
+      });
+
+      expect(styles.position).toBe("absolute");
+      expect(styles.left).toBe("-10000px");
+      expect(styles.visibility).toBe("hidden");
+      expect(styles.opacity).toBe("0");
+    }
+  });
+
+  test("7. Honeypots have event listeners attached", async ({ page }) => {
     await page.goto("/gate?next=/", { waitUntil: "domcontentloaded" });
 
     // Verify honeypot inputs exist and are interactive (not disabled)
-    const honeypots = ["#hp1", "#hp2", "#hp3"];
+    const honeypots = [DEFAULT_HONEYPOT_IDS[0], DEFAULT_HONEYPOT_IDS[1], DEFAULT_HONEYPOT_IDS[2]];
     for (const hp of honeypots) {
-      const element = page.locator(hp);
+      const element = page.locator(`#${hp}`);
       await expect(element).toBeAttached();
 
       // Check that the element is not disabled (can receive events)
@@ -173,9 +256,8 @@ test.describe("Gate Security Challenge", () => {
     }
 
     // Verify decoy links exist and are interactive
-    const decoys = ["#decoy1", "#decoy2", "#decoy3"];
-    for (const decoy of decoys) {
-      const element = page.locator(decoy);
+    for (const decoyId of DEFAULT_DECOY_IDS) {
+      const element = page.locator(`#${decoyId}`);
       await expect(element).toBeAttached();
       const isEnabled = await element.isEnabled();
       expect(isEnabled).toBe(true);
@@ -186,7 +268,7 @@ test.describe("Gate Security Challenge", () => {
    * EDGE CASES
    */
 
-  test("7. Works with different redirect destinations", async ({ page }) => {
+  test("8. Works with different redirect destinations", async ({ page }) => {
     await page.goto("/gate?next=/projects", { waitUntil: "domcontentloaded" });
     await waitForGateSuccess(page);
     await page.waitForURL("/projects", {
@@ -196,21 +278,20 @@ test.describe("Gate Security Challenge", () => {
     expect(new URL(page.url()).pathname).toBe("/projects");
   });
 
-  test("8. NoScript fallback message appears without JavaScript", async ({ browser }) => {
+  test("9. Gate page loads without JavaScript (no functionality expected)", async ({ browser }) => {
     const context = await browser.newContext({ javaScriptEnabled: false });
     const page = await context.newPage();
 
     await page.goto("/gate?next=/", { waitUntil: "domcontentloaded" });
 
-    // Verify noscript content is present
-    const noscriptContent = await page.locator("noscript").innerHTML();
-    expect(noscriptContent).toContain("Please enable JavaScript");
-    expect(noscriptContent).toContain("security check requires JavaScript");
+    // Gate UI should be present but non-functional without JS
+    await expect(page.locator(gateSelectors.container)).toBeVisible();
+    await expect(page.locator(gateSelectors.status)).toBeVisible();
 
     await context.close();
   });
 
-  test("9. Progress indicator updates during challenge", async ({ page }) => {
+  test("10. Progress indicator updates during challenge", async ({ page }) => {
     await page.goto("/gate?next=/", { waitUntil: "domcontentloaded" });
 
     const progress = page.locator(gateSelectors.progress);
@@ -230,7 +311,7 @@ test.describe("Gate Security Challenge", () => {
     expect(finalValue).toBe(100);
   });
 
-  test("10. Expired token forces re-challenge", async ({ page }) => {
+  test("11. Expired token forces re-challenge", async ({ page }) => {
     await page.goto("/gate?next=/", { waitUntil: "domcontentloaded" });
     await waitForGateSuccess(page);
     await page.waitForURL("/", {
@@ -261,5 +342,33 @@ test.describe("Gate Security Challenge", () => {
       timeout: DEFAULT_TIMEOUTS.REDIRECT,
       waitUntil: "domcontentloaded",
     });
+  });
+
+  test("12. Shielded content unlocks after client-side DOM injection", async ({ page }) => {
+    await page.goto("/gate?next=/", { waitUntil: "domcontentloaded" });
+    await waitForGateSuccess(page);
+    await page.waitForURL("/", {
+      timeout: DEFAULT_TIMEOUTS.REDIRECT,
+      waitUntil: "domcontentloaded",
+    });
+
+    await page.evaluate(() => {
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = `
+        <div data-astro-shield-block data-test-id="dynamic-shield-block">
+          <template data-astro-shield-template>
+            <article id="dynamic-shielded-target">Protected dynamic content</article>
+          </template>
+          <div data-astro-shield-content hidden></div>
+        </div>
+      `;
+      const block = wrapper.firstElementChild;
+      if (block) {
+        document.body.appendChild(block);
+      }
+    });
+
+    const dynamicContent = page.locator("#dynamic-shielded-target");
+    await expect(dynamicContent).toBeVisible();
   });
 });

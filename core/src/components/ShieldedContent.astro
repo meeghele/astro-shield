@@ -1,0 +1,22 @@
+---
+// Copyright (c) 2025 Michele Tavella <meeghele@proton.me>
+// Licensed under the MIT License. See LICENSE file for details.
+---
+
+<div data-astro-shield-block>
+  <template data-astro-shield-template>
+    <slot />
+  </template>
+
+  <div data-astro-shield-content hidden></div>
+</div>
+
+<style>
+  [data-astro-shield-block] {
+    display: contents;
+  }
+
+  [data-astro-shield-block][data-astro-shield-unlocked] [data-astro-shield-content] {
+    display: contents;
+  }
+</style>
