@@ -1,0 +1,31 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    container: oven/bun:latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install make
+        run: apt-get update && apt-get install -y make
+
+      - name: install dependencies
+        run: make install
+
+      - name: lint
+        run: make lint
+
+      - name: build
+        run: make build
+
+      - name: publish to npm
+        run: cd core && bun publish --access public
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
