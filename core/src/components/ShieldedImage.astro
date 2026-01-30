@@ -60,41 +60,7 @@ const resolvedSrc = typeof src === "string" ? src : src.src;
 </style>
 
 <script>
-  // Additional client-side protection for guarded images
-  const setupGuardedImages = () => {
-    const guardedImages = document.querySelectorAll('img[data-guarded="true"]');
-
-    guardedImages.forEach(img => {
-      // Disable right-click context menu
-      img.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        return false;
-      });
-
-      // Disable drag and drop
-      img.addEventListener('dragstart', (e) => {
-        e.preventDefault();
-        return false;
-      });
-
-      // Add honeypot-like behavior - detect bot attempts to access src directly
-      Object.defineProperty(img, '_originalSrc', {
-        value: img.dataset.originalSrc,
-        writable: false,
-        enumerable: false,
-        configurable: true
-      });
-    });
-  };
-
-  // Setup on DOM ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupGuardedImages);
-  } else {
-    setupGuardedImages();
-  }
-
-  // Listen for unlock events to remove darkening filter
+  // Unlock guarded images by removing the data-original-src attribute
   const swapGuardedImages = () => {
     const guardedImages = document.querySelectorAll('img[data-guarded="true"][data-original-src]');
     guardedImages.forEach(img => {
@@ -104,14 +70,68 @@ const resolvedSrc = typeof src === "string" ? src : src.src;
     });
   };
 
-  // Listen for various unlock events
+  // Setup protection handlers (right-click, drag prevention)
+  const setupGuardedImages = () => {
+    const guardedImages = document.querySelectorAll('img[data-guarded="true"]');
+    guardedImages.forEach(img => {
+      img.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        return false;
+      });
+      img.addEventListener('dragstart', (e) => {
+        e.preventDefault();
+        return false;
+      });
+      Object.defineProperty(img, '_originalSrc', {
+        value: img.dataset.originalSrc,
+        writable: false,
+        enumerable: false,
+        configurable: true
+      });
+    });
+  };
+
+  // Use MutationObserver to reliably detect unlock state (handles race condition)
+  const watchForUnlock = () => {
+    // Check if already unlocked
+    if (document.documentElement.hasAttribute('data-astro-shield-ready')) {
+      swapGuardedImages();
+      return;
+    }
+
+    // Watch for attribute change
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.attributeName === 'data-astro-shield-ready') {
+          if (document.documentElement.hasAttribute('data-astro-shield-ready')) {
+            swapGuardedImages();
+            observer.disconnect();
+            break;
+          }
+        }
+      }
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-astro-shield-ready']
+    });
+  };
+
+  // Setup protection handlers on DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupGuardedImages);
+  } else {
+    setupGuardedImages();
+  }
+
+  // Watch for unlock (handles race condition)
+  watchForUnlock();
+
+  // Keep event listeners for Astro navigation and manual unlock events
   document.addEventListener('astro-shield:unlocked', swapGuardedImages);
-  window.addEventListener('astro-shield:gate-success', swapGuardedImages);
   document.addEventListener('astro:page-load', () => {
     setupGuardedImages();
-    // Check if already unlocked
-    if (window.__ASTRO_SHIELD_READY__) {
-      swapGuardedImages();
-    }
+    watchForUnlock();
   });
 </script>
